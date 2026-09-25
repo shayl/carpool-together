@@ -1,0 +1,858 @@
+@import "tailwindcss";
+
+:root {
+  --background: #faf9fc;
+  --foreground: #252033;
+  --team: #5b4bdb;
+  --muted: #686174;
+  --border: #e5e1eb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --color-team: var(--team);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--team);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 16px;
+  z-index: 100;
+  padding: 12px;
+  background: white;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+.skip-link:not(:focus) {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  padding: 0;
+  clip-path: inset(50%);
+}
+
+.app-header {
+  border-bottom: 1px solid var(--border);
+  background: #ffffffed;
+}
+
+.app-header-inner {
+  display: flex;
+  max-width: 880px;
+  margin: auto;
+  padding: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand-lockup {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.team-logo {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--team);
+  color: white;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.brand-copy p,
+.brand-copy span {
+  display: block;
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-copy p {
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.brand-copy span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.group-switcher {
+  position: relative;
+  display: flex;
+  max-width: 240px;
+  align-items: center;
+}
+
+.group-switcher select {
+  width: 100%;
+  min-height: 42px;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  padding: 0 38px 0 12px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.group-switcher svg {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: var(--muted);
+}
+
+.app-main {
+  max-width: 760px;
+  margin: auto;
+  padding: 24px 16px calc(100px + env(safe-area-inset-bottom));
+  outline: none;
+}
+
+.app-navigation {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--border);
+  background: #fffffffa;
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+}
+
+.nav-item {
+  display: flex;
+  max-width: 200px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border-radius: 12px;
+  padding: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nav-item-active {
+  background: color-mix(in srgb, var(--team) 10%, white);
+  color: var(--team);
+}
+
+.screen-heading {
+  margin-bottom: 24px;
+}
+
+.screen-heading h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+
+.screen-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.week-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.week-heading > div {
+  text-align: center;
+}
+
+.week-heading strong,
+.week-heading span {
+  display: block;
+}
+
+.week-heading span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.icon-button {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 28px;
+}
+
+.icon-button:hover {
+  background: #f0edfc;
+  color: var(--team);
+}
+
+.coverage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 14px;
+  background: #edf6f1;
+  padding: 10px 14px;
+  color: #235842;
+  font-size: 13px;
+}
+
+.coverage-open {
+  background: #fff6e6;
+  color: #795012;
+}
+
+.ride-filters {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0;
+  border-radius: 14px;
+  background: #eeebf2;
+  padding: 4px;
+}
+
+.ride-filters button {
+  flex: 1;
+  border-radius: 10px;
+  padding: 8px 5px;
+  color: #5f576d;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ride-filters button[aria-pressed="true"] {
+  background: white;
+  color: var(--foreground);
+  box-shadow: 0 1px 3px #25203314;
+}
+
+.surface-card,
+.weekly-events-card {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+}
+
+.surface-card {
+  padding: 20px;
+}
+
+.weekly-events-card {
+  overflow: hidden;
+}
+
+.weekly-event-summary {
+  display: grid;
+  width: 100%;
+  min-height: 88px;
+  grid-template-columns: 52px minmax(0, 1fr) 92px 20px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.weekly-event-date,
+.weekly-event-name,
+.weekly-event-coverage {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.weekly-event-date strong,
+.weekly-event-name strong {
+  font-size: 15px;
+}
+
+.weekly-event-date span,
+.weekly-event-name span,
+.weekly-event-coverage > span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.weekly-event-name strong,
+.weekly-event-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekly-event-coverage {
+  align-items: center;
+  text-align: center;
+}
+
+.ride-status-car {
+  width: 56px;
+  height: 40px;
+  flex-shrink: 0;
+  overflow: visible;
+  color: var(--team);
+}
+
+.ride-status-car-happy {
+  filter: drop-shadow(
+    0 3px 4px color-mix(in srgb, var(--team) 20%, transparent)
+  );
+}
+
+.ride-status-car-sad {
+  color: #b83245;
+  transform: translateY(2px) rotate(-1.5deg);
+}
+
+.weekly-event-chevron {
+  color: var(--muted);
+  transform: rotate(180deg);
+}
+
+.weekly-event-details {
+  border-top: 1px solid var(--border);
+  background: #fcfbfd;
+  padding: 16px;
+}
+
+.event-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.event-detail-heading strong,
+.event-detail-heading span {
+  display: block;
+}
+
+.event-detail-heading span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.driver-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.driver-row,
+.person-row,
+.family-member {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.driver-row {
+  border-radius: 12px;
+  background: white;
+  padding: 10px 12px;
+}
+
+.driver-row strong,
+.driver-row span,
+.person-row strong,
+.person-row span,
+.family-member strong,
+.family-member span {
+  display: block;
+}
+
+.driver-row span,
+.person-row span,
+.family-member span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.person-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--team) 13%, white);
+  color: var(--team);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.person-avatar-large {
+  width: 48px;
+  height: 48px;
+  font-size: 14px;
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+}
+
+.primary-button {
+  background: var(--team);
+  color: white;
+}
+
+.secondary-button {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+}
+
+.suggestion-result {
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--team) 20%, var(--border));
+  border-radius: 14px;
+  background: white;
+  padding: 14px;
+}
+
+.suggestion-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--team);
+}
+
+.suggestion-title strong,
+.suggestion-title span {
+  display: block;
+}
+
+.suggestion-title span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.suggested-trip {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.suggested-trip strong,
+.suggested-trip span,
+.suggested-trip small {
+  display: block;
+}
+
+.suggested-trip span {
+  margin-top: 3px;
+  font-size: 14px;
+}
+
+.suggested-trip small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.unassigned,
+.error {
+  margin: 12px 0 0;
+  color: #8f382b;
+  font-size: 13px;
+}
+
+.ride-row {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding: 14px 0 2px;
+}
+
+.ride-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ride-row-main p {
+  margin: 3px 0 0;
+  font-size: 13px;
+}
+
+.status-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-covered {
+  color: #235842;
+}
+
+.settings-section-title {
+  margin: 24px 4px 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 8px;
+  color: var(--team);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.text-button:hover {
+  background: #f0edfc;
+}
+
+.back-button {
+  margin: -8px 0 12px -8px;
+}
+
+.card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card-heading h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.card-heading span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.person-row {
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+}
+
+.person-row > div:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.person-row small {
+  color: var(--team);
+  font-weight: 650;
+}
+
+.import-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 14px;
+  color: var(--team);
+}
+
+.import-heading strong,
+.import-heading span {
+  display: block;
+}
+
+.import-heading span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d9dce5;
+  border-radius: 0.75rem;
+  background: white;
+  padding: 0.75rem 0.875rem;
+  color: var(--foreground);
+  font-size: 1rem;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--team);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--team) 15%, transparent);
+}
+
+.roster-input {
+  min-height: 118px;
+  margin-bottom: 12px;
+  resize: vertical;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-link-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+}
+
+.settings-link-card button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 24px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  text-align: left;
+}
+
+.settings-link-card button + button {
+  border-top: 1px solid var(--border);
+}
+
+.settings-link-card button:hover {
+  background: #faf9fc;
+}
+
+.settings-link-card button > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.settings-link-card small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.about-card {
+  display: grid;
+  gap: 18px;
+}
+
+.about-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--team);
+}
+
+.about-heading svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.about-heading h2,
+.about-heading p {
+  margin: 0;
+}
+
+.about-heading h2 {
+  font-size: 18px;
+}
+
+.about-heading p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.legal-copy {
+  display: grid;
+  gap: 12px;
+  color: #40394c;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.legal-copy p {
+  margin: 0;
+}
+
+.legal-review-note {
+  border: 1px solid #eadcad;
+  border-radius: 12px;
+  background: #fff9e8;
+  padding: 12px 14px;
+  color: #694f12;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.app-version {
+  margin-top: 32px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .app-navigation {
+    position: sticky;
+    top: 0;
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px;
+  }
+
+  .nav-item {
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .app-main {
+    padding-bottom: 48px;
+  }
+
+  .weekly-event-summary {
+    grid-template-columns: 70px minmax(0, 1fr) 140px 24px;
+    padding: 14px 20px;
+  }
+
+  .weekly-event-coverage {
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+    text-align: right;
+  }
+
+  .weekly-event-details {
+    padding: 18px 20px 22px;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-header-inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .group-switcher {
+    width: 100%;
+    max-width: none;
+  }
+
+  .event-detail-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 360px) {
+  .app-main {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .weekly-event-summary {
+    grid-template-columns: 46px minmax(0, 1fr) 66px 18px;
+    gap: 6px;
+    padding-inline: 10px;
+  }
+
+  .ride-status-car {
+    width: 48px;
+  }
+
+  .nav-item {
+    padding-inline: 4px;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
