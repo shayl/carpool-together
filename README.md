@@ -20,9 +20,6 @@ Carpool database or reuse that application's credentials.
 The interface currently uses fictional in-memory data. The SQL migration is
 unapplied until a dedicated Carpool Together Supabase project is provisioned.
 
-See the ordered [production readiness roadmap](docs/production-readiness.md)
-for the implementation sequence and launch gates.
-
 ## Run locally
 
 ```powershell
