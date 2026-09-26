@@ -161,7 +161,7 @@ function coordinateFor(index: number, destination: Coordinate): Coordinate {
   };
 }
 
-export function CarpoolApp({ userEmail }: { userEmail: string }) {
+export function CarpoolApp({ memberName }: { memberName: string }) {
   const router = useRouter();
   const [groups, setGroups] = useState(initialGroups);
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
@@ -315,7 +315,7 @@ export function CarpoolApp({ userEmail }: { userEmail: string }) {
             </div>
             <div className="brand-copy">
               <p>{group.name} Carpool</p>
-              <span>{userEmail}</span>
+              <span>{memberName}</span>
             </div>
           </div>
           <div className="header-actions">

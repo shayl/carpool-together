@@ -10,8 +10,38 @@ export default async function Home() {
     return <SignInForm />;
   }
 
-  const email =
-    typeof data.claims.email === "string" ? data.claims.email : "Signed in";
+  const userId =
+    typeof data.claims.sub === "string" ? data.claims.sub : undefined;
 
-  return <CarpoolApp userEmail={email} />;
+  if (!userId) {
+    return <SignInForm />;
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("group_memberships")
+    .select("group_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) {
+    throw membershipError;
+  }
+
+  if (!membership) {
+    return <SignInForm />;
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("user_id", userId)
+    .single();
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  return <CarpoolApp memberName={profile.display_name} />;
 }
