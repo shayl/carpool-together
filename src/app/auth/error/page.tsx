@@ -7,10 +7,9 @@ export default function AuthErrorPage() {
         <div className="auth-logo" aria-hidden="true">
           CT
         </div>
-        <h1>That sign-in link did not work</h1>
+        <h1>Sign-in could not be completed</h1>
         <p className="auth-description">
-          The link may have expired or already been used. Request a new one to
-          continue.
+          Return to the sign-in page and try your Google account again.
         </p>
         <Link className="primary-button" href="/">
           Return to sign in

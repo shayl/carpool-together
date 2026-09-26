@@ -15,10 +15,11 @@ Carpool database or reuse that application's credentials.
 - Send validated requests to a server-side suggestion endpoint.
 - Produce deterministic, capacity-aware trips and explain uncovered riders.
 - Define tenant-scoped database tables and Row Level Security.
+- Authenticate users through Google OAuth and Supabase Auth.
 - Explain service limitations on the About page.
 
-The interface currently uses fictional in-memory data. The SQL migration is
-unapplied until a dedicated Carpool Together Supabase project is provisioned.
+The interface currently uses fictional in-memory group and ride data. The
+isolated Supabase schema and authentication layer are provisioned.
 
 ## Run locally
 
@@ -46,17 +47,19 @@ npm run build
 2. Copy `.env.example` to `.env.local` and add only that project's values.
 3. Review `supabase/migrations/20260924000000_initial_schema.sql`.
 4. Apply the migration only to the Carpool Together project.
-5. Add verified authentication and a server-only data access layer before
-   replacing the fictional in-memory data.
+5. Configure Google OAuth in Google Auth Platform and enable the Google
+   provider in Supabase Auth.
+6. Add a server-only data access layer before replacing the fictional
+   in-memory data.
 
 ## Current limitations
 
 - Coordinates and meeting points are fictional.
 - Straight-line distance stands in for a road-time matrix provider.
 - Imported data is held only in React state and resets on refresh.
-- Authentication, invitations, consent capture, persistence, route ordering,
-  and driver acceptance are represented in the schema but are not wired into
-  the application yet.
+- Invitations, consent capture, persistence, route ordering, and driver
+  acceptance are represented in the schema but are not wired into the
+  application yet.
 - Suggestions are drafts, not ride commitments.
 - The About-page notice is not a substitute for attorney-reviewed Terms of
   Service, a Privacy Policy, or legally required consent language.
