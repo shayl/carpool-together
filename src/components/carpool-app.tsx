@@ -7,18 +7,21 @@ import {
   ChevronDown,
   Heart,
   Info,
+  LogOut,
   Settings,
   ShieldCheck,
   Upload,
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   Coordinate,
   DriverOffer,
   Participant,
   SuggestionPlan,
 } from "@/lib/carpool";
+import { createClient } from "@/lib/supabase/browser";
 
 type Group = {
   id: string;
@@ -158,7 +161,8 @@ function coordinateFor(index: number, destination: Coordinate): Coordinate {
   };
 }
 
-export function CarpoolApp() {
+export function CarpoolApp({ userEmail }: { userEmail: string }) {
+  const router = useRouter();
   const [groups, setGroups] = useState(initialGroups);
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
   const [destination, setDestination] = useState<Destination>("rides");
@@ -169,6 +173,7 @@ export function CarpoolApp() {
   const [plan, setPlan] = useState<SuggestionPlan | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const group = useMemo(
     () => groups.find((item) => item.id === activeGroupId) ?? groups[0],
@@ -280,6 +285,20 @@ export function CarpoolApp() {
     }
   }
 
+  async function signOut() {
+    setSigningOut(true);
+    const supabase = createClient();
+    const { error: signOutError } = await supabase.auth.signOut();
+
+    if (signOutError) {
+      setError(signOutError.message);
+      setSigningOut(false);
+      return;
+    }
+
+    router.refresh();
+  }
+
   return (
     <div
       className="app-shell"
@@ -296,23 +315,35 @@ export function CarpoolApp() {
             </div>
             <div className="brand-copy">
               <p>{group.name} Carpool</p>
-              <span>Chen family</span>
+              <span>{userEmail}</span>
             </div>
           </div>
-          <label className="group-switcher">
-            <span className="sr-only">Active group</span>
-            <select
-              value={activeGroupId}
-              onChange={(event) => switchGroup(event.target.value)}
+          <div className="header-actions">
+            <label className="group-switcher">
+              <span className="sr-only">Active group</span>
+              <select
+                value={activeGroupId}
+                onChange={(event) => switchGroup(event.target.value)}
+              >
+                {groups.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} aria-hidden="true" />
+            </label>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="Sign out"
+              title="Sign out"
+              disabled={signingOut}
+              onClick={signOut}
             >
-              {groups.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={16} aria-hidden="true" />
-          </label>
+              <LogOut size={19} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </header>
 

@@ -136,11 +136,142 @@ button:disabled {
   font-size: 14px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .group-switcher {
   position: relative;
   display: flex;
   max-width: 240px;
   align-items: center;
+}
+
+.auth-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(
+      circle at top,
+      color-mix(in srgb, var(--team) 12%, transparent),
+      transparent 36%
+    ),
+    var(--background);
+}
+
+.auth-card {
+  display: grid;
+  width: min(100%, 430px);
+  gap: 22px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: white;
+  padding: 28px;
+  box-shadow: 0 18px 50px #25203314;
+}
+
+.auth-logo {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--team);
+  color: white;
+  font-weight: 850;
+}
+
+.auth-card h1,
+.auth-card p {
+  margin: 0;
+}
+
+.auth-card h1 {
+  margin-top: 4px;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.auth-eyebrow {
+  color: var(--team);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.auth-description {
+  margin-top: 8px !important;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.auth-form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-form label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.auth-input-wrap {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #d9dce5;
+  border-radius: 12px;
+  padding: 0 13px;
+  color: var(--muted);
+}
+
+.auth-input-wrap:focus-within {
+  border-color: var(--team);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--team) 15%, transparent);
+}
+
+.auth-input-wrap input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--foreground);
+}
+
+.auth-form .primary-button,
+.auth-card > .primary-button {
+  width: 100%;
+  margin-top: 4px;
+  text-decoration: none;
+}
+
+.auth-message {
+  border-radius: 12px;
+  background: #edf6f1;
+  padding: 12px 14px;
+  color: #235842;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.auth-error {
+  border-radius: 12px;
+  background: #fff0ed;
+  padding: 12px 14px;
+  color: #8f382b;
+  font-size: 14px;
+}
+
+.auth-footnote {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .group-switcher select {
@@ -815,8 +946,13 @@ button:disabled {
   }
 
   .group-switcher {
-    width: 100%;
+    min-width: 0;
+    flex: 1;
     max-width: none;
+  }
+
+  .header-actions {
+    width: 100%;
   }
 
   .event-detail-heading {
