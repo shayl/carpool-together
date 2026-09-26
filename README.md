@@ -27,8 +27,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. The current in-memory experience does not require
-environment variables or a database.
+Open `http://localhost:3000`. Use `localhost` consistently during development
+because authentication cookies do not carry over to `127.0.0.1`. Loopback-IP
+browser visits are replaced with the canonical local hostname.
 
 ## Validate
 
