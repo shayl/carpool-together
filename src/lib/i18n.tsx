@@ -87,6 +87,11 @@ export const hebrew: Record<string, string> = {
     "הוסיפו אירועים חד-פעמיים או אירועים שבועיים קבועים.",
   "Add venue": "הוספת מקום",
   Address: "כתובת",
+  "Home address": "כתובת הבית",
+  "Used only to coordinate pickups and routes within your group.":
+    "משמשת רק לתיאום איסופים ומסלולים בתוך הקבוצה שלכם.",
+  "123 Main St, City": "רחוב הדוגמה 123, עיר",
+  "Save address": "שמירת הכתובת",
   "All rides covered": "לכל הנסיעות יש נהג",
   "Apply an absence to several events at once.":
     "החילו היעדרות על כמה אירועים בבת אחת.",

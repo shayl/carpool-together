@@ -672,6 +672,14 @@ function FamilySchedule({ groupId, schedule }: Props) {
   const [selected, setSelected] = useState<string[]>(
     participants.map((item) => item.id),
   );
+  const [addressDraft, setAddressDraft] = useState({
+    householdId: household?.id ?? null,
+    value: household?.address ?? "",
+  });
+  const address =
+    addressDraft.householdId === household?.id
+      ? addressDraft.value
+      : (household?.address ?? "");
   const futureEvents = schedule.events
     .filter(
       (event) =>
@@ -686,6 +694,63 @@ function FamilySchedule({ groupId, schedule }: Props) {
         <h1>{t("My family")}</h1>
         <p>{household?.name ?? t("Your riders, your plans.")}</p>
       </div>
+      {household && (
+        <section className="surface-card">
+          <div className="card-heading">
+            <div>
+              <h2>{t("Home address")}</h2>
+              <p className="text-muted">
+                {t(
+                  "Used only to coordinate pickups and routes within your group.",
+                )}
+              </p>
+            </div>
+          </div>
+          <form
+            className="schedule-form household-address-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              await mutation.mutate(
+                "households",
+                "PATCH",
+                { address },
+                "save-address",
+              );
+            }}
+          >
+            <label>
+              {t("Address")}
+              <input
+                className="input"
+                type="text"
+                autoComplete="street-address"
+                maxLength={300}
+                required
+                value={address}
+                onChange={(input) =>
+                  setAddressDraft({
+                    householdId: household.id,
+                    value: input.target.value,
+                  })
+                }
+                placeholder={t("123 Main St, City")}
+              />
+            </label>
+            <button
+              className="primary-button"
+              disabled={
+                mutation.busyKey === "save-address" ||
+                !address.trim() ||
+                address.trim() === household.address
+              }
+            >
+              {mutation.busyKey === "save-address"
+                ? t("Saving…")
+                : t("Save address")}
+            </button>
+          </form>
+        </section>
+      )}
       <section className="surface-card">
         <h2>{t("Upcoming ride status")}</h2>
         {participants.map((participant) => (

@@ -899,6 +899,15 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+.household-address-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.household-address-form > .primary-button {
+  align-self: end;
+  grid-column: auto;
+}
+
 .family-schedule {
   margin-top: 16px;
 }
@@ -955,6 +964,10 @@ button:disabled {
 
   .schedule-form {
     grid-template-columns: 1fr;
+  }
+
+  .household-address-form > .primary-button {
+    grid-column: 1;
   }
 
   .family-event-row {
