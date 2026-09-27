@@ -27,6 +27,10 @@ import {
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  groupResourceUrl,
+  type GroupScheduleResource,
+} from "@/lib/group-resource-url";
+import {
   driveCounts,
   effectiveAttendance,
   eventCoverage,
@@ -100,7 +104,7 @@ function useMutation(groupId: string) {
   const [message, setMessage] = useState("");
 
   async function mutate(
-    resource: string,
+    resource: GroupScheduleResource,
     method: string,
     body: unknown,
     key: string,
@@ -109,14 +113,11 @@ function useMutation(groupId: string) {
     setError("");
     setMessage("");
     try {
-      const response = await fetch(
-        `/api/groups/${groupId}/schedule/${resource}`,
-        {
+      const response = await fetch(groupResourceUrl(groupId, resource), {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
-        },
-      );
+        });
       await readResult(response);
       setMessage(method === "DELETE" ? t("Removed.") : t("Saved."));
       router.refresh();
