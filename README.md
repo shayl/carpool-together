@@ -10,6 +10,7 @@ Carpool database or reuse that application's credentials.
 ## Current functionality
 
 - Create and switch between private database-backed groups.
+- Register and create a first group without deployment-level secrets.
 - Protect each group with a private phone roster and hashed shared PIN.
 - Let owners import roster members from pasted name/phone data.
 - Send validated requests to a server-side suggestion endpoint.
@@ -50,10 +51,10 @@ npm run build
 4. Apply the migration only to the Carpool Together project.
 5. Enable anonymous sign-ins in Supabase Auth.
 6. Add the project's server-only secret key as `SUPABASE_SECRET_KEY`.
-7. Set a strong one-time `BOOTSTRAP_SECRET` and use the first-group setup
-   screen.
-8. Add a server-only data access layer before replacing the fictional
-   in-memory data.
+7. Open the app and use **Register and create a group** to create the first
+   owner, roster entry, and group.
+8. Keep `AUTH_RATE_LIMIT_SECRET` private; it protects sign-in and registration
+   throttling identifiers.
 
 ## Current limitations
 

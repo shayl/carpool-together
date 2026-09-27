@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { clientAddress } from "@/lib/client-address";
 import { normalizePhone } from "@/lib/phone";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -9,14 +10,8 @@ function identifierHash(phone: string, request: Request) {
   const secret = process.env.AUTH_RATE_LIMIT_SECRET;
   if (!secret) throw new Error("AUTH_RATE_LIMIT_SECRET is required.");
 
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const address =
-    forwardedFor?.split(",", 1)[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "local";
-
   return createHmac("sha256", secret)
-    .update(`${normalizePhone(phone)}|${address}`)
+    .update(`${normalizePhone(phone)}|${clientAddress(request)}`)
     .digest("hex");
 }
 

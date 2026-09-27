@@ -7,10 +7,34 @@ import { createClient } from "@/lib/supabase/browser";
 
 export function SignInForm() {
   const router = useRouter();
+  const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
+  const [groupName, setGroupName] = useState("");
+  const [memberName, setMemberName] = useState("");
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  async function anonymousAccessToken() {
+    const supabase = createClient();
+    let { data } = await supabase.auth.getSession();
+
+    if (data.session && !data.session.user.is_anonymous) {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      data = { session: null };
+    }
+
+    if (!data.session) {
+      const result = await supabase.auth.signInAnonymously();
+      if (result.error) throw result.error;
+      data = { session: result.data.session };
+    }
+
+    const accessToken = data.session?.access_token;
+    if (!accessToken) throw new Error("Could not create a device session.");
+    return accessToken;
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -18,41 +42,47 @@ export function SignInForm() {
     setError("");
 
     try {
-      const supabase = createClient();
-      let { data } = await supabase.auth.getSession();
-
-      if (data.session && !data.session.user.is_anonymous) {
-        const { error: signOutError } = await supabase.auth.signOut();
-        if (signOutError) throw signOutError;
-        data = { session: null };
-      }
-
-      if (!data.session) {
-        const result = await supabase.auth.signInAnonymously();
-        if (result.error) throw result.error;
-        data = { session: result.data.session };
-      }
-
-      const accessToken = data.session?.access_token;
-      if (!accessToken) throw new Error("Could not create a device session.");
-
-      const response = await fetch("/api/login", {
+      const accessToken = await anonymousAccessToken();
+      const registering = mode === "register";
+      const response = await fetch(registering ? "/api/register" : "/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, pin, accessToken }),
+        body: JSON.stringify({
+          phone,
+          pin,
+          accessToken,
+          ...(registering ? { groupName, memberName } : {}),
+        }),
       });
       const result = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        throw new Error(result.error ?? "Sign-in failed.");
+        throw new Error(
+          result.error ??
+            (registering ? "Could not create the group." : "Sign-in failed."),
+        );
       }
 
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Sign-in failed.");
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : mode === "register"
+            ? "Could not create the group."
+            : "Sign-in failed.",
+      );
       setBusy(false);
     }
   }
+
+  function changeMode(nextMode: "sign-in" | "register") {
+    setMode(nextMode);
+    setError("");
+    setPin("");
+  }
+
+  const registering = mode === "register";
 
   return (
     <main className="auth-page">
@@ -62,13 +92,44 @@ export function SignInForm() {
         </div>
         <div>
           <p className="auth-eyebrow">Carpool Together</p>
-          <h1 id="sign-in-heading">Sign in to your groups</h1>
+          <h1 id="sign-in-heading">
+            {registering ? "Create your group" : "Sign in to your groups"}
+          </h1>
           <p className="auth-description">
-            Use the phone number on your group roster and the shared group PIN.
+            {registering
+              ? "Start a private group and invite members with their phone number."
+              : "Use the phone number on your group roster and the shared group PIN."}
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          {registering && (
+            <>
+              <label htmlFor="group-name">Group name</label>
+              <div className="auth-input-wrap">
+                <input
+                  id="group-name"
+                  required
+                  maxLength={100}
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value)}
+                  placeholder="Neighborhood carpool"
+                />
+              </div>
+              <label htmlFor="member-name">Your name</label>
+              <div className="auth-input-wrap">
+                <input
+                  id="member-name"
+                  required
+                  maxLength={100}
+                  autoComplete="name"
+                  value={memberName}
+                  onChange={(event) => setMemberName(event.target.value)}
+                  placeholder="Alex Morgan"
+                />
+              </div>
+            </>
+          )}
           <label htmlFor="phone">Phone number</label>
           <div className="auth-input-wrap">
             <input
@@ -93,7 +154,7 @@ export function SignInForm() {
               id="pin"
               name="pin"
               type="password"
-              autoComplete="current-password"
+              autoComplete={registering ? "new-password" : "current-password"}
               inputMode="numeric"
               minLength={4}
               maxLength={12}
@@ -104,7 +165,13 @@ export function SignInForm() {
             />
           </div>
           <button className="primary-button" type="submit" disabled={busy}>
-            {busy ? "Signing in…" : "Open my groups"}
+            {busy
+              ? registering
+                ? "Creating group…"
+                : "Signing in…"
+              : registering
+                ? "Register and create group"
+                : "Open my groups"}
           </button>
         </form>
 
@@ -113,8 +180,24 @@ export function SignInForm() {
             {error}
           </p>
         )}
+        <div className="auth-switch">
+          <span>
+            {registering
+              ? "Already belong to a group?"
+              : "Starting a new carpool group?"}
+          </span>
+          <button
+            type="button"
+            onClick={() => changeMode(registering ? "sign-in" : "register")}
+            disabled={busy}
+          >
+            {registering ? "Sign in" : "Register and create a group"}
+          </button>
+        </div>
         <p className="auth-footnote">
-          Ask a group organizer if you do not know the PIN.{" "}
+          {registering
+            ? "By creating a group, you agree to handle member information responsibly. "
+            : "Ask a group organizer if you do not know the PIN. "}
           <Link href="/privacy">Privacy notice</Link>
         </p>
       </section>
