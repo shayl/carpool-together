@@ -37,10 +37,8 @@ const destinations = [
 
 export function CarpoolApp({
   initialGroups,
-  memberName,
 }: {
   initialGroups: AppGroup[];
-  memberName: string;
 }) {
   const router = useRouter();
   const { t } = useI18n();
@@ -370,7 +368,7 @@ export function CarpoolApp({
             />
             <div className="brand-copy">
               <p>{t("{{group}} Carpool", { group: group.name })}</p>
-              <span>{memberName}</span>
+              <span>{group.currentMemberName}</span>
             </div>
           </div>
           <div className="header-actions">

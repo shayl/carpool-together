@@ -2,7 +2,6 @@ import { connection } from "next/server";
 import { CarpoolApp } from "@/components/carpool-app";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { loadAppData } from "@/lib/app-data";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Home() {
@@ -27,18 +26,5 @@ export default async function Home() {
     return <SignInForm />;
   }
 
-  const admin = createAdminClient();
-  const { data: profile, error: profileError } = await admin
-    .from("profiles")
-    .select("display_name")
-    .eq("user_id", userId)
-    .single();
-
-  if (profileError) {
-    throw profileError;
-  }
-
-  return (
-    <CarpoolApp initialGroups={groups} memberName={profile.display_name} />
-  );
+  return <CarpoolApp initialGroups={groups} />;
 }

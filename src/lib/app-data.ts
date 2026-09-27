@@ -21,6 +21,7 @@ export type AppGroup = {
   role: GroupRole;
   canManageRoster: boolean;
   currentRosterEntryId: string | null;
+  currentMemberName: string;
   roster: AppRosterEntry[];
   schedule: GroupSchedule;
 };
@@ -76,6 +77,12 @@ export async function loadAppData(userId: string) {
 
     const role = membership.role as GroupRole;
     const canManageRoster = role === "owner" || role === "admin";
+    const groupRoster = (roster ?? []).filter(
+      (entry) => entry.group_id === group.id,
+    );
+    const currentRosterEntry = groupRoster.find(
+      (entry) => entry.id === membership.roster_entry_id,
+    );
 
     return [
       {
@@ -89,6 +96,7 @@ export async function loadAppData(userId: string) {
         role,
         canManageRoster,
         currentRosterEntryId: membership.roster_entry_id,
+        currentMemberName: currentRosterEntry?.display_name ?? "Member",
         schedule: schedules.get(group.id) ?? {
           households: [],
           participants: [],
@@ -101,9 +109,7 @@ export async function loadAppData(userId: string) {
           templates: [],
           currentHouseholdId: null,
         },
-        roster: (roster ?? [])
-          .filter((entry) => entry.group_id === group.id)
-          .map((entry) => ({
+        roster: groupRoster.map((entry) => ({
             id: entry.id,
             displayName: entry.display_name,
             ...(canManageRoster ? { phone: entry.phone } : {}),
