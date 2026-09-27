@@ -212,6 +212,12 @@ export function SignInForm() {
             : t("Ask a group organizer if you do not know the PIN. ")}
           <Link href="/privacy">{t("Privacy notice")}</Link>
         </p>
+        <p className="developer-credit">
+          {t("Developed by")}{" "}
+          <a href="https://github.com/shayl" rel="me">
+            @shayl
+          </a>
+        </p>
       </section>
     </main>
   );

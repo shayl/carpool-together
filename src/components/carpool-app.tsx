@@ -50,7 +50,9 @@ export function CarpoolApp({
   const groups = initialGroups;
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
   const [destination, setDestination] = useState<Destination>("rides");
-  const [settingsPage, setSettingsPage] = useState<"about" | null>(null);
+  const [settingsPage, setSettingsPage] = useState<
+    "about" | "groups" | null
+  >(null);
   const [csv, setCsv] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupPin, setNewGroupPin] = useState("");
@@ -89,6 +91,19 @@ export function CarpoolApp({
     setError("");
     setDestination("rides");
     setSettingsPage(null);
+  }
+
+  function switchGroupFromSettings(groupId: string) {
+    setActiveGroupId(groupId);
+    setPlan(null);
+    setError("");
+    setSettingsPage(null);
+  }
+
+  function openGroupSchedule() {
+    setDestination("rides");
+    setSettingsPage(null);
+    setError("");
   }
 
   async function importRoster() {
@@ -631,6 +646,51 @@ export function CarpoolApp({
           </>
         )}
 
+        {destination === "settings" && settingsPage === "groups" && (
+          <>
+            <button
+              className="text-button back-button"
+              type="button"
+              onClick={() => setSettingsPage(null)}
+            >
+              <ArrowLeft size={18} aria-hidden="true" />
+              {t("Settings")}
+            </button>
+            <div className="screen-heading">
+              <h1>{t("Switch group")}</h1>
+              <p>{t("Choose the group you want to manage.")}</p>
+            </div>
+            <section
+              className="settings-link-card"
+              aria-label={t("Your groups")}
+            >
+              {groups.map((item) => {
+                const isCurrent = item.id === activeGroupId;
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-current={isCurrent ? "true" : undefined}
+                    onClick={() => switchGroupFromSettings(item.id)}
+                  >
+                    <span className="settings-group-logo" aria-hidden="true">
+                      {item.shortName}
+                    </span>
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {isCurrent ? t("Current group") : t("Open this group")}
+                      </small>
+                    </span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                );
+              })}
+            </section>
+          </>
+        )}
+
         {destination === "settings" && settingsPage === null && (
           <>
             <div className="screen-heading">
@@ -639,7 +699,10 @@ export function CarpoolApp({
             </div>
             <h2 className="settings-section-title">{t("Active group")}</h2>
             <section className="settings-link-card">
-              <button type="button">
+              <button
+                type="button"
+                onClick={() => setSettingsPage("groups")}
+              >
                 <Users size={22} aria-hidden="true" />
                 <span>
                   <strong>{t("Switch group")}</strong>
@@ -651,7 +714,7 @@ export function CarpoolApp({
                 </span>
                 <span aria-hidden="true">›</span>
               </button>
-              <button type="button">
+              <button type="button" onClick={openGroupSchedule}>
                 <CalendarDays size={22} aria-hidden="true" />
                 <span>
                   <strong>{t("Group schedule")}</strong>
@@ -659,7 +722,7 @@ export function CarpoolApp({
                 </span>
                 <span aria-hidden="true">›</span>
               </button>
-              <button type="button">
+              <button type="button" onClick={() => router.push("/privacy")}>
                 <ShieldCheck size={22} aria-hidden="true" />
                 <span>
                   <strong>{t("Privacy and consent")}</strong>
@@ -724,7 +787,12 @@ export function CarpoolApp({
           </>
         )}
 
-        <footer className="app-version">Carpool Together</footer>
+        <footer className="app-version">
+          Carpool Together · {t("Developed by")}{" "}
+          <a href="https://github.com/shayl" rel="me">
+            @shayl
+          </a>
+        </footer>
       </main>
     </div>
   );

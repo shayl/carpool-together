@@ -93,6 +93,10 @@ const hebrew: Record<string, string> = {
   "This notice is not legal advice or a replacement for complete Terms of Service and a Privacy Policy. Obtain review from a qualified attorney before a public launch.":
     "הודעה זו אינה ייעוץ משפטי ואינה תחליף לתנאי שימוש ולמדיניות פרטיות מלאים. יש לקבל בדיקה מעורך דין מוסמך לפני השקה ציבורית.",
   "Switch group": "החלפת קבוצה",
+  "Choose the group you want to manage.": "בחרו את הקבוצה שברצונכם לנהל.",
+  "Your groups": "הקבוצות שלכם",
+  "Current group": "הקבוצה הנוכחית",
+  "Open this group": "פתיחת הקבוצה",
   "Your account belongs to {{count}} private groups.":
     "החשבון שלכם משויך ל-{{count}} קבוצות פרטיות.",
   "Group schedule": "לוח הזמנים של הקבוצה",
@@ -112,6 +116,7 @@ const hebrew: Record<string, string> = {
   "Create group": "יצירת קבוצה",
   "Could not create the group.": "לא ניתן ליצור את הקבוצה.",
   "Carpool Together": "Carpool Together",
+  "Developed by": "פותח על ידי",
   "Sign in to your groups": "כניסה לקבוצות שלכם",
   "Create your group": "יצירת הקבוצה שלכם",
   "Start a private group and invite members with their phone number.":
