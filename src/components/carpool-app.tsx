@@ -288,6 +288,29 @@ export function CarpoolApp({
 
   async function signOut() {
     setSigningOut(true);
+    if ("serviceWorker" in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription =
+          await registration?.pushManager.getSubscription();
+        if (subscription) {
+          const response = await fetch("/api/push-subscriptions", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          });
+          if (!response.ok && response.status !== 404) {
+            throw new Error("Could not remove this device's reminders.");
+          }
+          await subscription.unsubscribe();
+        }
+      } catch (notificationError) {
+        console.error(
+          "Could not remove push subscription during sign out",
+          notificationError,
+        );
+      }
+    }
     const { error: signOutError } = await createClient().auth.signOut();
     if (signOutError) {
       setError(signOutError.message);
