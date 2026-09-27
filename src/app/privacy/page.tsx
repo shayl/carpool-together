@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AppVersion } from "@/components/app-version";
 import { useI18n } from "@/lib/i18n";
 
 export default function PrivacyPage() {
@@ -44,6 +45,7 @@ export default function PrivacyPage() {
         <Link className="primary-button" href="/">
           {t("Return to the app")}
         </Link>
+        <AppVersion />
       </article>
     </main>
   );

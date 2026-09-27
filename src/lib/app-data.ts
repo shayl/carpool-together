@@ -1,6 +1,7 @@
 import type { GroupRole } from "@/lib/server-auth";
+import { loadGroupSchedules } from "@/lib/group-schedule-data";
+import type { GroupSchedule } from "@/lib/schedule-types";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Coordinate, DriverOffer, Participant } from "@/lib/carpool";
 
 export type AppRosterEntry = {
   id: string;
@@ -18,10 +19,7 @@ export type AppGroup = {
   role: GroupRole;
   canManageRoster: boolean;
   roster: AppRosterEntry[];
-  event: string | null;
-  destination: Coordinate;
-  participants: Participant[];
-  drivers: DriverOffer[];
+  schedule: GroupSchedule;
 };
 
 function initials(value: string) {
@@ -48,8 +46,11 @@ export async function loadAppData(userId: string) {
   if (!memberships?.length) return [];
 
   const groupIds = memberships.map((membership) => membership.group_id);
-  const [{ data: groups, error: groupsError }, { data: roster, error: rosterError }] =
-    await Promise.all([
+  const [
+    { data: groups, error: groupsError },
+    { data: roster, error: rosterError },
+    schedules,
+  ] = await Promise.all([
       admin
         .from("groups")
         .select("id, name, accent_color")
@@ -59,6 +60,7 @@ export async function loadAppData(userId: string) {
         .select("id, group_id, display_name, phone, role, active")
         .in("group_id", groupIds)
         .order("display_name"),
+      loadGroupSchedules(groupIds, userId),
     ]);
 
   if (groupsError) throw groupsError;
@@ -80,10 +82,18 @@ export async function loadAppData(userId: string) {
         accent: group.accent_color,
         role,
         canManageRoster,
-        event: null,
-        destination: { lat: 0, lng: 0 },
-        participants: [],
-        drivers: [],
+        schedule: schedules.get(group.id) ?? {
+          households: [],
+          participants: [],
+          locations: [],
+          events: [],
+          attendance: [],
+          claims: [],
+          breaks: [],
+          absencePeriods: [],
+          templates: [],
+          currentHouseholdId: null,
+        },
         roster: (roster ?? [])
           .filter((entry) => entry.group_id === group.id)
           .map((entry) => ({

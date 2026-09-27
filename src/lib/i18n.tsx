@@ -69,6 +69,16 @@ const hebrew: Record<string, string> = {
   coordinator: "רכז",
   member: "חבר",
   "Add members": "הוספת חברים",
+  "Add people to the group": "הוספת אנשים לקבוצה",
+  "Add one person or import several at once.":
+    "הוסיפו אדם אחד או ייבאו כמה אנשים בבת אחת.",
+  "Add one person": "הוספת אדם",
+  "Bulk import": "ייבוא מרובה",
+  Name: "שם",
+  Role: "תפקיד",
+  "Add person": "הוספת אדם",
+  "Import people": "ייבוא אנשים",
+  "Could not add the person.": "לא ניתן להוסיף את האדם.",
   "Import selected people": "ייבוא אנשים נבחרים",
   "Paste name and phone, one per line.": "הדביקו שם וטלפון, אחד בכל שורה.",
   "Roster rows": "שורות רשימת חברים",
@@ -111,6 +121,21 @@ const hebrew: Record<string, string> = {
   "Group name": "שם הקבוצה",
   "Neighborhood carpool": "קבוצת נסיעות שכונתית",
   "Shared group PIN": "קוד הקבוצה המשותף",
+  "6-digit group PIN": "קוד קבוצה בן 6 ספרות",
+  "Group created": "הקבוצה נוצרה",
+  "Generated group PIN": "קוד הקבוצה שנוצר",
+  "Save and share this PIN with group members. It will not be shown again.":
+    "שמרו ושתפו את הקוד עם חברי הקבוצה. הוא לא יוצג שוב.",
+  "Copy PIN": "העתקת הקוד",
+  Copied: "הועתק",
+  "Continue to group": "המשך לקבוצה",
+  "Could not copy the PIN. Select and copy it manually.":
+    "לא ניתן להעתיק את הקוד. סמנו והעתיקו אותו ידנית.",
+  "A secure 6-digit group PIN will be generated automatically.":
+    "קוד קבוצה מאובטח בן 6 ספרות ייווצר אוטומטית.",
+  "Could not generate a group PIN.": "לא ניתן ליצור קוד לקבוצה.",
+  "Could not generate a unique group PIN. Try again.":
+    "לא ניתן ליצור קוד ייחודי לקבוצה. נסו שוב.",
   "4 to 12 characters": "4 עד 12 תווים",
   "Creating…": "יוצרים…",
   "Create group": "יצירת קבוצה",

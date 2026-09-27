@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AppVersion } from "@/components/app-version";
+import { GeneratedGroupPin } from "@/components/generated-group-pin";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/browser";
 
@@ -16,6 +18,10 @@ export function SignInForm() {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [createdGroup, setCreatedGroup] = useState<{
+    name: string;
+    pin: string;
+  } | null>(null);
 
   async function anonymousAccessToken() {
     const supabase = createClient();
@@ -51,12 +57,11 @@ export function SignInForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone,
-          pin,
           accessToken,
-          ...(registering ? { groupName, memberName } : {}),
+          ...(registering ? { groupName, memberName } : { pin }),
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as { error?: string; pin?: string };
 
       if (!response.ok) {
         throw new Error(
@@ -67,7 +72,12 @@ export function SignInForm() {
         );
       }
 
-      router.refresh();
+      if (registering && result.pin) {
+        setCreatedGroup({ name: groupName, pin: result.pin });
+        setBusy(false);
+      } else {
+        router.refresh();
+      }
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -84,9 +94,25 @@ export function SignInForm() {
     setMode(nextMode);
     setError("");
     setPin("");
+    setCreatedGroup(null);
   }
 
   const registering = mode === "register";
+
+  if (createdGroup) {
+    return (
+      <main className="auth-page">
+        <section className="auth-card">
+          <GeneratedGroupPin
+            groupName={createdGroup.name}
+            pin={createdGroup.pin}
+            onContinue={() => router.refresh()}
+          />
+          <AppVersion />
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="auth-page">
@@ -158,22 +184,26 @@ export function SignInForm() {
           <p id="phone-hint" className="auth-footnote">
             {t("For US numbers, enter all 10 digits. No +1 needed.")}
           </p>
-          <label htmlFor="pin">{t("Group PIN")}</label>
-          <div className="auth-input-wrap">
-            <input
-              id="pin"
-              name="pin"
-              type="password"
-              autoComplete={registering ? "new-password" : "current-password"}
-              inputMode="numeric"
-              minLength={4}
-              maxLength={12}
-              required
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-              placeholder={t("Shared group PIN")}
-            />
-          </div>
+          {!registering && (
+            <>
+              <label htmlFor="pin">{t("Group PIN")}</label>
+              <div className="auth-input-wrap">
+                <input
+                  id="pin"
+                  name="pin"
+                  type="password"
+                  autoComplete="current-password"
+                  inputMode="numeric"
+                  minLength={4}
+                  maxLength={12}
+                  required
+                  value={pin}
+                  onChange={(event) => setPin(event.target.value)}
+                  placeholder={t("Shared group PIN")}
+                />
+              </div>
+            </>
+          )}
           <button className="primary-button" type="submit" disabled={busy}>
             {busy
               ? registering
@@ -212,6 +242,7 @@ export function SignInForm() {
             : t("Ask a group organizer if you do not know the PIN. ")}
           <Link href="/privacy">{t("Privacy notice")}</Link>
         </p>
+        <AppVersion />
       </section>
     </main>
   );

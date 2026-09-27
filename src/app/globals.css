@@ -713,6 +713,268 @@ button:disabled {
   gap: 8px;
 }
 
+.schedule-toolbar,
+.schedule-navigation,
+.schedule-actions,
+.claim-row,
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-toolbar {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.coverage-bar {
+  gap: 10px;
+}
+
+.coverage-bar .text-button {
+  margin-inline-start: auto;
+}
+
+.weekly-event-summary {
+  border: 0;
+  background: transparent;
+}
+
+.weekly-event-open {
+  border-color: #f2b8b5;
+}
+
+.weekly-event-covered {
+  border-color: #a8dcc4;
+}
+
+.event-chevron-expanded {
+  transform: rotate(90deg);
+}
+
+[dir="rtl"] .event-chevron-expanded {
+  transform: rotate(-90deg);
+}
+
+.ride-leg-panel,
+.attendance-panel {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.ride-leg-panel h3,
+.ride-leg-panel p,
+.attendance-panel h3 {
+  margin: 0;
+}
+
+.claim-row .input {
+  flex: 1 1 180px;
+}
+
+.rider-list {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.attendance-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) repeat(3, auto);
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.attendance-row label,
+.checkbox-row,
+.participant-pills label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.month-calendar {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+}
+
+.month-weekdays,
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.month-weekdays {
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.month-weekdays span {
+  padding: 9px 2px;
+}
+
+.month-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.month-day {
+  min-height: 90px;
+  border-inline-end: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 6px;
+}
+
+.month-day:nth-child(7n) {
+  border-inline-end: 0;
+}
+
+.month-day > time {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.month-day-empty {
+  background: #faf9fc;
+}
+
+.month-events {
+  display: grid;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.month-event {
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: #f1efff;
+  padding: 4px;
+  color: var(--foreground);
+  font-size: 9px;
+  text-align: start;
+}
+
+.month-event-open {
+  background: #fff0ed;
+}
+
+.month-event-covered {
+  background: #edf6f1;
+}
+
+.schedule-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  border-radius: 14px;
+  background: #faf9fc;
+  padding: 16px;
+}
+
+.schedule-form > label:not(.checkbox-row) {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.schedule-form .confirmation-actions,
+.schedule-form > .primary-button {
+  grid-column: 1 / -1;
+}
+
+.family-schedule {
+  margin-top: 16px;
+}
+
+.family-schedule h3 {
+  margin-bottom: 8px;
+}
+
+.family-event-row,
+.period-row,
+.drive-count-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding: 11px 0;
+  font-size: 13px;
+}
+
+.period-row > span:first-child {
+  display: grid;
+}
+
+.period-row small {
+  color: var(--muted);
+}
+
+.participant-pills {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.participant-pills label {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 11px;
+}
+
+.manage-event-list {
+  margin-top: 16px;
+}
+
+.text-danger {
+  color: #b42318;
+}
+
+@media (max-width: 640px) {
+  .attendance-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .schedule-form {
+    grid-template-columns: 1fr;
+  }
+
+  .family-event-row {
+    grid-template-columns: 90px 1fr;
+  }
+
+  .family-event-row > span:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .month-day {
+    min-height: 68px;
+    padding: 3px;
+  }
+
+  .month-event span {
+    display: none;
+  }
+}
+
 .primary-button {
   background: var(--team);
   color: white;
@@ -1022,10 +1284,46 @@ button:disabled {
 }
 
 .app-version {
+  display: block;
   margin-top: 32px;
   color: var(--muted);
   font-size: 12px;
   text-align: center;
+}
+
+.generated-pin-card {
+  display: grid;
+  gap: 16px;
+  text-align: center;
+}
+
+.generated-pin-card h2,
+.generated-pin-card p {
+  margin: 0;
+}
+
+.generated-pin {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f8f7ff;
+  padding: 16px;
+  color: var(--foreground);
+  font-size: clamp(30px, 9vw, 44px);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.generated-pin-card .secondary-button {
+  justify-content: center;
+}
+
+.about-version {
+  display: block;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 @media (min-width: 640px) {

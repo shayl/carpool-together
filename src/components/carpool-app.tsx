@@ -15,12 +15,15 @@ import {
 } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AppVersion } from "@/components/app-version";
+import { GeneratedGroupPin } from "@/components/generated-group-pin";
+import { ScheduleViews } from "@/components/schedule-views";
 import type { AppGroup } from "@/lib/app-data";
-import type { SuggestionPlan } from "@/lib/carpool";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/browser";
 
 type Destination = "rides" | "family" | "team" | "settings";
+type SettingsPage = "about" | "groups" | null;
 
 const destinations = [
   { id: "rides", label: "Rides", icon: Car },
@@ -32,6 +35,7 @@ const destinations = [
 function initials(name: string) {
   return name
     .split(/\s+/)
+    .filter(Boolean)
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
@@ -50,15 +54,21 @@ export function CarpoolApp({
   const groups = initialGroups;
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
   const [destination, setDestination] = useState<Destination>("rides");
-  const [settingsPage, setSettingsPage] = useState<
-    "about" | "groups" | null
-  >(null);
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>(null);
+  const [rosterMode, setRosterMode] = useState<"single" | "bulk">("single");
+  const [memberDisplayName, setMemberDisplayName] = useState("");
+  const [memberPhone, setMemberPhone] = useState("");
+  const [memberRole, setMemberRole] = useState<
+    "admin" | "coordinator" | "member"
+  >("member");
   const [csv, setCsv] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupPin, setNewGroupPin] = useState("");
+  const [createdGroup, setCreatedGroup] = useState<{
+    name: string;
+    pin: string;
+  } | null>(null);
   const [showDeleteGroup, setShowDeleteGroup] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [plan, setPlan] = useState<SuggestionPlan | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -67,79 +77,18 @@ export function CarpoolApp({
     () => groups.find((item) => item.id === activeGroupId) ?? groups[0],
     [activeGroupId, groups],
   );
-  const participantById = useMemo(
-    () =>
-      new Map(
-        group.participants.map((participant) => [
-          participant.id,
-          participant,
-        ]),
-      ),
-    [group.participants],
-  );
-  const riders = group.participants.filter((participant) => participant.needsRide);
-  const availableSeats = group.drivers.reduce(
-    (total, driver) => total + driver.seats,
-    0,
-  );
-  const coveredCount = plan
-    ? plan.trips.reduce((total, trip) => total + trip.riderIds.length, 0)
-    : Math.min(riders.length, availableSeats);
-  const fullyCovered = riders.length > 0 && coveredCount >= riders.length;
 
-  function switchGroup(groupId: string) {
-    setActiveGroupId(groupId);
-    setPlan(null);
+  function resetGroupState() {
     setError("");
-    setDestination("rides");
-    setSettingsPage(null);
     setShowDeleteGroup(false);
     setDeleteConfirmation("");
   }
 
-  function switchGroupFromSettings(groupId: string) {
+  function switchGroup(groupId: string, nextDestination: Destination) {
     setActiveGroupId(groupId);
-    setPlan(null);
-    setError("");
+    setDestination(nextDestination);
     setSettingsPage(null);
-  }
-
-  function openGroupSchedule() {
-    setDestination("rides");
-    setSettingsPage(null);
-    setError("");
-  }
-
-  async function deleteGroup() {
-    if (deleteConfirmation !== group.name) return;
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`/api/groups/${group.id}`, {
-        method: "DELETE",
-      });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(
-          result.error ? t(result.error) : t("Could not delete the group."),
-        );
-      }
-
-      const nextGroup = groups.find((item) => item.id !== group.id);
-      if (nextGroup) setActiveGroupId(nextGroup.id);
-      setShowDeleteGroup(false);
-      setDeleteConfirmation("");
-      setDestination(nextGroup ? "settings" : "rides");
-      router.refresh();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t("Could not delete the group."),
-      );
-    } finally {
-      setLoading(false);
-    }
+    resetGroupState();
   }
 
   async function importRoster() {
@@ -147,15 +96,13 @@ export function CarpoolApp({
       .split(/\r?\n/)
       .map((line) => line.split(",").map((cell) => cell.trim()))
       .filter(([name, phone]) => Boolean(name && phone));
-
-    if (rows.length === 0) {
+    if (!rows.length) {
       setError(t("Add at least one row in the format Name, Phone."));
       return;
     }
 
     setLoading(true);
     setError("");
-
     try {
       const response = await fetch(`/api/groups/${group.id}/roster`, {
         method: "POST",
@@ -171,12 +118,9 @@ export function CarpoolApp({
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
         throw new Error(
-          result.error
-            ? t(result.error)
-            : t("Could not update the roster."),
+          result.error ? t(result.error) : t("Could not update the roster."),
         );
       }
-
       setCsv("");
       router.refresh();
     } catch (caught) {
@@ -190,31 +134,70 @@ export function CarpoolApp({
     }
   }
 
+  async function addMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/groups/${group.id}/roster`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            {
+              displayName: memberDisplayName,
+              phone: memberPhone,
+              role: memberRole,
+            },
+          ],
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          result.error ? t(result.error) : t("Could not add the person."),
+        );
+      }
+      setMemberDisplayName("");
+      setMemberPhone("");
+      setMemberRole("member");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : t("Could not add the person."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function createGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError("");
-
     try {
       const response = await fetch("/api/groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newGroupName, pin: newGroupPin }),
+        body: JSON.stringify({ name: newGroupName }),
       });
       const result = (await response.json()) as {
         error?: string;
         groupId?: string;
+        pin?: string;
       };
       if (!response.ok) {
         throw new Error(
-          result.error
-            ? t(result.error)
-            : t("Could not create the group."),
+          result.error ? t(result.error) : t("Could not create the group."),
         );
       }
-
+      if (!result.pin) {
+        throw new Error(t("Could not generate a group PIN."));
+      }
+      setCreatedGroup({ name: newGroupName, pin: result.pin });
       setNewGroupName("");
-      setNewGroupPin("");
       if (result.groupId) setActiveGroupId(result.groupId);
       router.refresh();
     } catch (caught) {
@@ -228,35 +211,29 @@ export function CarpoolApp({
     }
   }
 
-  async function generatePlan() {
+  async function deleteGroup() {
+    if (deleteConfirmation !== group.name) return;
     setLoading(true);
     setError("");
-
     try {
-      const response = await fetch("/api/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          groupId: group.id,
-          destination: group.destination,
-          participants: group.participants,
-          drivers: group.drivers,
-        }),
+      const response = await fetch(`/api/groups/${group.id}`, {
+        method: "DELETE",
       });
-      const result: SuggestionPlan | { error: string } = await response.json();
-
-      if (!response.ok || "error" in result) {
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
         throw new Error(
-          "error" in result
-            ? t(result.error)
-            : t("Unable to plan rides."),
+          result.error ? t(result.error) : t("Could not delete the group."),
         );
       }
-
-      setPlan(result);
+      const nextGroup = groups.find((item) => item.id !== group.id);
+      if (nextGroup) setActiveGroupId(nextGroup.id);
+      setDestination(nextGroup ? "settings" : "rides");
+      setShowDeleteGroup(false);
+      setDeleteConfirmation("");
+      router.refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : t("Unable to plan rides."),
+        caught instanceof Error ? caught.message : t("Could not delete the group."),
       );
     } finally {
       setLoading(false);
@@ -265,15 +242,12 @@ export function CarpoolApp({
 
   async function signOut() {
     setSigningOut(true);
-    const supabase = createClient();
-    const { error: signOutError } = await supabase.auth.signOut();
-
+    const { error: signOutError } = await createClient().auth.signOut();
     if (signOutError) {
       setError(signOutError.message);
       setSigningOut(false);
       return;
     }
-
     router.refresh();
   }
 
@@ -301,7 +275,7 @@ export function CarpoolApp({
               <span className="sr-only">{t("Active group")}</span>
               <select
                 value={activeGroupId}
-                onChange={(event) => switchGroup(event.target.value)}
+                onChange={(event) => switchGroup(event.target.value, "rides")}
               >
                 {groups.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -334,7 +308,7 @@ export function CarpoolApp({
             onClick={() => {
               setDestination(id);
               setSettingsPage(null);
-              setError("");
+              resetGroupState();
             }}
             className={
               destination === id ? "nav-item nav-item-active" : "nav-item"
@@ -347,231 +321,20 @@ export function CarpoolApp({
       </nav>
 
       <main id="main-content" tabIndex={-1} className="app-main">
-        {destination === "rides" && (
-          <>
-            <div className="screen-heading">
-              <h1>{t("Rides")}</h1>
-              <p>{t("A little teamwork. Every ride.")}</p>
-            </div>
-
-            {!group.event ? (
-              <section className="surface-card">
-                <h2>{t("No events scheduled")}</h2>
-                <p className="text-muted">
-                  {t(
-                    "Event and ride planning will appear here after an organizer creates the group schedule.",
-                  )}
-                </p>
-              </section>
-            ) : (
-              <>
-            <section className="week-heading" aria-label={t("Week navigation")}>
-              <button className="icon-button" type="button" aria-label={t("Previous week")}>
-                ‹
-              </button>
-              <div>
-                <strong>{t("This week")}</strong>
-                <span>{t("Sep 21 – Sep 27")}</span>
-              </div>
-              <button className="icon-button" type="button" aria-label={t("Next week")}>
-                ›
-              </button>
-            </section>
-
-            <div
-              className={
-                fullyCovered ? "coverage-bar" : "coverage-bar coverage-open"
-              }
-            >
-              <span>
-                <strong>
-                  {fullyCovered
-                    ? t("Every ride has a seat")
-                    : t("{{count}} rides need help", {
-                        count: riders.length - coveredCount,
-                      })}
-                </strong>
-              </span>
-              <span>
-                {t("{{covered}} of {{total}} covered", {
-                  covered: coveredCount,
-                  total: riders.length,
-                })}
-              </span>
-            </div>
-
-            <div className="ride-filters" aria-label={t("Ride filters")}>
-              <button type="button" aria-pressed="true">
-                {t("All")}
-              </button>
-              <button type="button" aria-pressed="false">
-                {t("Needs a family")}
-              </button>
-              <button type="button" aria-pressed="false">
-                {t("My family")}
-              </button>
-            </div>
-
-            <section className="weekly-events-card">
-              <article className="weekly-event">
-                <div className="weekly-event-summary">
-                  <div className="weekly-event-date">
-                    <strong>{t("Thu 24")}</strong>
-                    <span>{t("5:30 PM")}</span>
-                  </div>
-                  <div className="weekly-event-name">
-                    <strong>{group.event.split(" at ")[0]}</strong>
-                    <span>{group.event.split(" at ")[1]}</span>
-                  </div>
-                  <div className="weekly-event-coverage">
-                    <Car
-                      className={
-                        fullyCovered
-                          ? "ride-status-car ride-status-car-happy"
-                          : "ride-status-car ride-status-car-sad"
-                      }
-                      aria-hidden="true"
-                    />
-                    <span>
-                      {fullyCovered ? t("Covered") : t("Needs a driver")}
-                    </span>
-                  </div>
-                  <ChevronDown className="weekly-event-chevron" size={20} />
-                </div>
-
-                <div className="weekly-event-details">
-                  <div className="event-detail-heading">
-                    <div>
-                      <strong>{t("Homeward ride")}</strong>
-                      <span>
-                        {t("{{riders}} riders · {{seats}} seats offered", {
-                          riders: riders.length,
-                          seats: availableSeats,
-                        })}
-                      </span>
-                    </div>
-                    <button
-                      className="primary-button"
-                      type="button"
-                      onClick={generatePlan}
-                      disabled={loading}
-                    >
-                      {loading ? t("Planning…") : t("Suggest carpools")}
-                    </button>
-                  </div>
-
-                  <div className="driver-list">
-                    {group.drivers.map((driver) => (
-                      <div className="driver-row" key={driver.id}>
-                        <div className="person-avatar">{initials(driver.name)}</div>
-                        <div>
-                          <strong>{driver.name}</strong>
-                          <span>
-                            {driver.address} · {driver.seats}{" "}
-                            {driver.seats === 1 ? t("seat") : t("seats")}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {plan && (
-                    <div className="suggestion-result">
-                      <div className="suggestion-title">
-                        <ShieldCheck size={19} aria-hidden="true" />
-                        <div>
-                          <strong>{t("Suggested plan")}</strong>
-                          <span>{t("Draft until each driver accepts")}</span>
-                        </div>
-                      </div>
-                      {plan.trips.map((trip) => (
-                        <div className="suggested-trip" key={trip.driverId}>
-                          <strong>{trip.driverName}</strong>
-                          <span>
-                            {trip.riderIds.length
-                              ? trip.riderIds
-                                  .map(
-                                    (id) =>
-                                      participantById.get(id)?.name ?? id,
-                                  )
-                                  .join(", ")
-                              : t("No pickup needed")}
-                          </span>
-                          <small>
-                            {t(
-                              "+{{miles}} mi estimated · {{seats}} seats left",
-                              {
-                                miles: trip.estimatedDetourMiles,
-                                seats: trip.seatsRemaining,
-                              },
-                            )}
-                          </small>
-                        </div>
-                      ))}
-                      {plan.unassigned.length > 0 && (
-                        <p className="unassigned">
-                          <strong>{t("Still needs a seat:")}</strong>{" "}
-                          {plan.unassigned
-                            .map(
-                              (item) =>
-                                participantById.get(item.participantId)?.name ??
-                                item.participantId,
-                            )
-                            .join(", ")}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {error && <p className="error">{error}</p>}
-                </div>
-              </article>
-            </section>
-              </>
-            )}
-          </>
-        )}
-
-        {destination === "family" && (
-          <>
-            <div className="screen-heading">
-              <h1>{t("My family")}</h1>
-              <p>{t("Your riders, your plans.")}</p>
-            </div>
-            <section className="surface-card">
-              <div className="family-member">
-                <div className="person-avatar person-avatar-large">
-                  {initials(group.participants[0]?.name ?? t("Family"))}
-                </div>
-                <div>
-                  <strong>
-                    {group.participants[0]?.name ?? t("No rider yet")}
-                  </strong>
-                  <span>{group.participants[0]?.address}</span>
-                </div>
-              </div>
-              <div className="ride-row">
-                <div className="ride-row-main">
-                  <div>
-                    <strong>{t("Thursday practice")}</strong>
-                    <p className="text-muted">
-                      {t("Homeward ride requested")}
-                    </p>
-                  </div>
-                  <span className="status-label status-covered">
-                    {t("Covered")}
-                  </span>
-                </div>
-              </div>
-            </section>
-          </>
+        {(destination === "rides" ||
+          destination === "family" ||
+          destination === "team") && (
+          <ScheduleViews
+            groupId={group.id}
+            groupName={group.name}
+            canManage={group.canManageRoster}
+            view={destination}
+            schedule={group.schedule}
+          />
         )}
 
         {destination === "team" && (
           <>
-            <div className="screen-heading">
-              <h1>{t("Team")}</h1>
-              <p>{t("The people who keep everyone moving.")}</p>
-            </div>
             <section className="surface-card roster-card">
               <div className="card-heading">
                 <h2>{t("Group roster")}</h2>
@@ -592,301 +355,114 @@ export function CarpoolApp({
                 </div>
               ))}
             </section>
-
             {group.canManageRoster && (
               <>
-            <h2 className="settings-section-title">{t("Add members")}</h2>
-            <section className="surface-card import-card">
-              <div className="import-heading">
-                <Upload size={22} aria-hidden="true" />
-                <div>
-                  <strong>{t("Import selected people")}</strong>
-                  <span>{t("Paste name and phone, one per line.")}</span>
-                </div>
-              </div>
-              <label>
-                <span className="sr-only">{t("Roster rows")}</span>
-                <textarea
-                  className="input roster-input"
-                  value={csv}
-                  onChange={(event) => setCsv(event.target.value)}
-                  placeholder={`${t("Alex Morgan")}, 425-555-0100\nSam Rivera, 425-555-0101`}
-                />
-              </label>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={importRoster}
-                disabled={loading}
-              >
-                {loading ? t("Adding…") : t("Add selected people")}
-              </button>
-              {error && <p className="error">{error}</p>}
-            </section>
-
-              </>
-            )}
-          </>
-        )}
-
-        {destination === "settings" && settingsPage === "about" && (
-          <>
-            <button
-              className="text-button back-button"
-              type="button"
-              onClick={() => setSettingsPage(null)}
-            >
-              <ArrowLeft size={18} aria-hidden="true" />
-              {t("Settings")}
-            </button>
-            <div className="screen-heading">
-              <h1>{t("About")}</h1>
-              <p>{t("Private groups. Smarter rides.")}</p>
-            </div>
-
-            <section className="surface-card about-card">
-              <div className="about-heading">
-                <Info size={24} aria-hidden="true" />
-                <div>
-                  <h2>{t("Important notice")}</h2>
-                  <p>{t("Please understand the limits of this service.")}</p>
-                </div>
-              </div>
-              <div className="legal-copy">
-                <p>
-                  {t(
-                    "Carpool Together is a coordination tool. It is not a transportation provider, rideshare broker, employer, insurer, background-check service, or emergency service.",
-                  )}
-                </p>
-                <p>
-                  {t(
-                    "The service does not verify drivers, vehicles, licenses, insurance, child-restraint equipment, routes, schedules, or safety. Users and group organizers decide whether to offer or accept a ride and remain responsible for following applicable laws and confirming that each ride is appropriate.",
-                  )}
-                </p>
-                <p>
-                  {t(
-                    "Route, timing, capacity, and carpool suggestions are estimates for planning only. They are not guarantees. Do not rely on the service for emergencies or time-critical transportation.",
-                  )}
-                </p>
-                <p>
-                  {t(
-                    "To the fullest extent permitted by applicable law, this proof service is provided “as is” and “as available,” without warranties. Use it at your own risk. Nothing in this notice limits rights or responsibilities that cannot legally be waived.",
-                  )}
-                </p>
-              </div>
-              <div className="legal-review-note">
-                {t(
-                  "This notice is not legal advice or a replacement for complete Terms of Service and a Privacy Policy. Obtain review from a qualified attorney before a public launch.",
-                )}
-              </div>
-            </section>
-          </>
-        )}
-
-        {destination === "settings" && settingsPage === "groups" && (
-          <>
-            <button
-              className="text-button back-button"
-              type="button"
-              onClick={() => setSettingsPage(null)}
-            >
-              <ArrowLeft size={18} aria-hidden="true" />
-              {t("Settings")}
-            </button>
-            <div className="screen-heading">
-              <h1>{t("Switch group")}</h1>
-              <p>{t("Choose the group you want to manage.")}</p>
-            </div>
-            <section
-              className="settings-link-card"
-              aria-label={t("Your groups")}
-            >
-              {groups.map((item) => {
-                const isCurrent = item.id === activeGroupId;
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    aria-current={isCurrent ? "true" : undefined}
-                    onClick={() => switchGroupFromSettings(item.id)}
-                  >
-                    <span className="settings-group-logo" aria-hidden="true">
-                      {item.shortName}
-                    </span>
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>
-                        {isCurrent ? t("Current group") : t("Open this group")}
-                      </small>
-                    </span>
-                    <span aria-hidden="true">›</span>
-                  </button>
-                );
-              })}
-            </section>
-          </>
-        )}
-
-        {destination === "settings" && settingsPage === null && (
-          <>
-            <div className="screen-heading">
-              <h1>{t("Settings")}</h1>
-              <p>{group.name}</p>
-            </div>
-            <h2 className="settings-section-title">{t("Active group")}</h2>
-            <section className="settings-link-card">
-              <button
-                type="button"
-                onClick={() => setSettingsPage("groups")}
-              >
-                <Users size={22} aria-hidden="true" />
-                <span>
-                  <strong>{t("Switch group")}</strong>
-                  <small>
-                    {t("Your account belongs to {{count}} private groups.", {
-                      count: groups.length,
-                    })}
-                  </small>
-                </span>
-                <span aria-hidden="true">›</span>
-              </button>
-              <button type="button" onClick={openGroupSchedule}>
-                <CalendarDays size={22} aria-hidden="true" />
-                <span>
-                  <strong>{t("Group schedule")}</strong>
-                  <small>{group.event ?? t("No event scheduled")}</small>
-                </span>
-                <span aria-hidden="true">›</span>
-              </button>
-              <button type="button" onClick={() => router.push("/privacy")}>
-                <ShieldCheck size={22} aria-hidden="true" />
-                <span>
-                  <strong>{t("Privacy and consent")}</strong>
-                  <small>
-                    {t("Addresses stay private to authorized rides.")}
-                  </small>
-                </span>
-                <span aria-hidden="true">›</span>
-              </button>
-              <button type="button" onClick={() => setSettingsPage("about")}>
-                <Info size={22} aria-hidden="true" />
-                <span>
-                  <strong>{t("About and important notice")}</strong>
-                  <small>
-                    {t("What this service does—and does not—provide.")}
-                  </small>
-                </span>
-                <span aria-hidden="true">›</span>
-              </button>
-            </section>
-
-            <h2 className="settings-section-title">
-              {t("Create another group")}
-            </h2>
-            <section className="surface-card">
-              <form className="auth-form" onSubmit={createGroup}>
-                <label htmlFor="new-group-name">{t("Group name")}</label>
-                <div className="auth-input-wrap">
-                  <input
-                    id="new-group-name"
-                    required
-                    maxLength={100}
-                    value={newGroupName}
-                    onChange={(event) => setNewGroupName(event.target.value)}
-                    placeholder={t("Neighborhood carpool")}
-                  />
-                </div>
-                <label htmlFor="new-group-pin">{t("Shared group PIN")}</label>
-                <div className="auth-input-wrap">
-                  <input
-                    id="new-group-pin"
-                    required
-                    type="password"
-                    inputMode="numeric"
-                    minLength={4}
-                    maxLength={12}
-                    value={newGroupPin}
-                    onChange={(event) => setNewGroupPin(event.target.value)}
-                    placeholder={t("4 to 12 characters")}
-                  />
-                </div>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={loading}
-                >
-                  {loading ? t("Creating…") : t("Create group")}
-                </button>
-              </form>
-              {error && <p className="error">{error}</p>}
-            </section>
-
-            {group.role === "owner" && (
-              <>
-                <h2 className="settings-section-title">{t("Danger zone")}</h2>
-                <section className="surface-card danger-card">
-                  <div>
-                    <h3>{t("Delete this group")}</h3>
-                    <p className="text-muted">
-                      {t(
-                        "Permanently delete this group, its roster, and all of its carpool data.",
-                      )}
-                    </p>
+                <h2 className="settings-section-title">{t("Add members")}</h2>
+                <section className="surface-card import-card">
+                  <div className="import-heading">
+                    <Upload size={22} aria-hidden="true" />
+                    <div>
+                      <strong>{t("Add people to the group")}</strong>
+                      <span>{t("Add one person or import several at once.")}</span>
+                    </div>
                   </div>
-                  {!showDeleteGroup ? (
+                  <div className="ride-filters" role="group">
                     <button
-                      className="danger-button"
                       type="button"
-                      onClick={() => {
-                        setShowDeleteGroup(true);
-                        setError("");
-                      }}
+                      aria-pressed={rosterMode === "single"}
+                      onClick={() => setRosterMode("single")}
                     >
-                      {t("Delete group")}
+                      {t("Add one person")}
                     </button>
-                  ) : (
-                    <div className="delete-group-confirmation">
-                      <label htmlFor="delete-group-confirmation">
-                        {t("Type {{name}} to confirm.", { name: group.name })}
-                      </label>
-                      <div className="auth-input-wrap">
+                    <button
+                      type="button"
+                      aria-pressed={rosterMode === "bulk"}
+                      onClick={() => setRosterMode("bulk")}
+                    >
+                      {t("Bulk import")}
+                    </button>
+                  </div>
+                  {rosterMode === "single" ? (
+                    <form className="schedule-form" onSubmit={addMember}>
+                      <label>
+                        {t("Name")}
                         <input
-                          id="delete-group-confirmation"
-                          autoComplete="off"
-                          value={deleteConfirmation}
+                          className="input"
+                          required
+                          maxLength={100}
+                          autoComplete="name"
+                          value={memberDisplayName}
                           onChange={(event) =>
-                            setDeleteConfirmation(event.target.value)
+                            setMemberDisplayName(event.target.value)
                           }
                         />
-                      </div>
-                      <div className="confirmation-actions">
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          disabled={loading}
-                          onClick={() => {
-                            setShowDeleteGroup(false);
-                            setDeleteConfirmation("");
-                            setError("");
-                          }}
-                        >
-                          {t("Cancel")}
-                        </button>
-                        <button
-                          className="danger-button"
-                          type="button"
-                          disabled={
-                            loading || deleteConfirmation !== group.name
+                      </label>
+                      <label>
+                        {t("Phone number")}
+                        <input
+                          className="input"
+                          required
+                          type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          maxLength={30}
+                          value={memberPhone}
+                          onChange={(event) =>
+                            setMemberPhone(event.target.value)
                           }
-                          onClick={deleteGroup}
+                        />
+                      </label>
+                      <label>
+                        {t("Role")}
+                        <select
+                          className="input"
+                          value={memberRole}
+                          onChange={(event) =>
+                            setMemberRole(
+                              event.target.value as
+                                | "admin"
+                                | "coordinator"
+                                | "member",
+                            )
+                          }
                         >
-                          {loading
-                            ? t("Deleting…")
-                            : t("Permanently delete group")}
-                        </button>
-                      </div>
-                    </div>
+                          <option value="member">{t("member")}</option>
+                          <option value="coordinator">
+                            {t("coordinator")}
+                          </option>
+                          <option value="admin">{t("admin")}</option>
+                        </select>
+                      </label>
+                      <button
+                        className="primary-button"
+                        disabled={loading}
+                      >
+                        {loading ? t("Adding…") : t("Add person")}
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <label>
+                        <span className="sr-only">{t("Roster rows")}</span>
+                        <textarea
+                          className="input roster-input"
+                          value={csv}
+                          onChange={(event) => setCsv(event.target.value)}
+                          placeholder={`${t("Alex Morgan")}, 425-555-0100\nSam Rivera, 425-555-0101`}
+                        />
+                      </label>
+                      <p className="text-muted">
+                        {t("Paste name and phone, one per line.")}
+                      </p>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        onClick={importRoster}
+                        disabled={loading}
+                      >
+                        {loading ? t("Adding…") : t("Import people")}
+                      </button>
+                    </>
                   )}
                   {error && <p className="error">{error}</p>}
                 </section>
@@ -895,8 +471,304 @@ export function CarpoolApp({
           </>
         )}
 
-        <footer className="app-version">Carpool Together</footer>
+        {destination === "settings" && settingsPage === "about" && (
+          <AboutSettings onBack={() => setSettingsPage(null)} />
+        )}
+        {destination === "settings" && settingsPage === "groups" && (
+          <GroupSettings
+            groups={groups}
+            activeGroupId={activeGroupId}
+            onBack={() => setSettingsPage(null)}
+            onGroup={(groupId) => switchGroup(groupId, "settings")}
+          />
+        )}
+        {destination === "settings" && settingsPage === null && (
+          <SettingsHome
+            group={group}
+            groups={groups}
+            loading={loading}
+            error={error}
+            newGroupName={newGroupName}
+            createdGroup={createdGroup}
+            showDeleteGroup={showDeleteGroup}
+            deleteConfirmation={deleteConfirmation}
+            onGroups={() => setSettingsPage("groups")}
+            onSchedule={() => setDestination("rides")}
+            onPrivacy={() => router.push("/privacy")}
+            onAbout={() => setSettingsPage("about")}
+            onCreateGroup={createGroup}
+            onGroupName={setNewGroupName}
+            onCreatedGroupDone={() => setCreatedGroup(null)}
+            onShowDelete={() => {
+              setShowDeleteGroup(true);
+              setError("");
+            }}
+            onDeleteConfirmation={setDeleteConfirmation}
+            onCancelDelete={() => {
+              setShowDeleteGroup(false);
+              setDeleteConfirmation("");
+              setError("");
+            }}
+            onDelete={deleteGroup}
+          />
+        )}
+        <footer>
+          <AppVersion />
+        </footer>
       </main>
     </div>
+  );
+}
+
+function AboutSettings({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <button className="text-button back-button" type="button" onClick={onBack}>
+        <ArrowLeft size={18} />
+        {t("Settings")}
+      </button>
+      <div className="screen-heading">
+        <h1>{t("About")}</h1>
+        <p>{t("Private groups. Smarter rides.")}</p>
+      </div>
+      <section className="surface-card about-card">
+        <div className="about-heading">
+          <Info size={24} />
+          <div>
+            <h2>{t("Important notice")}</h2>
+            <p>{t("Please understand the limits of this service.")}</p>
+          </div>
+        </div>
+        <div className="legal-copy">
+          <p>
+            {t(
+              "Carpool Together is a coordination tool. It is not a transportation provider, rideshare broker, employer, insurer, background-check service, or emergency service.",
+            )}
+          </p>
+          <p>
+            {t(
+              "The service does not verify drivers, vehicles, licenses, insurance, child-restraint equipment, routes, schedules, or safety. Users and group organizers decide whether to offer or accept a ride and remain responsible for following applicable laws and confirming that each ride is appropriate.",
+            )}
+          </p>
+        </div>
+        <AppVersion className="about-version" />
+      </section>
+    </>
+  );
+}
+
+function GroupSettings({
+  groups,
+  activeGroupId,
+  onBack,
+  onGroup,
+}: {
+  groups: AppGroup[];
+  activeGroupId: string;
+  onBack: () => void;
+  onGroup: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <>
+      <button className="text-button back-button" type="button" onClick={onBack}>
+        <ArrowLeft size={18} />
+        {t("Settings")}
+      </button>
+      <div className="screen-heading">
+        <h1>{t("Switch group")}</h1>
+        <p>{t("Choose the group you want to manage.")}</p>
+      </div>
+      <section className="settings-link-card" aria-label={t("Your groups")}>
+        {groups.map((item) => {
+          const current = item.id === activeGroupId;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={current ? "true" : undefined}
+              onClick={() => onGroup(item.id)}
+            >
+              <span className="settings-group-logo">{item.shortName}</span>
+              <span>
+                <strong>{item.name}</strong>
+                <small>
+                  {current ? t("Current group") : t("Open this group")}
+                </small>
+              </span>
+              <span aria-hidden="true">›</span>
+            </button>
+          );
+        })}
+      </section>
+    </>
+  );
+}
+
+type SettingsHomeProps = {
+  group: AppGroup;
+  groups: AppGroup[];
+  loading: boolean;
+  error: string;
+  newGroupName: string;
+  createdGroup: { name: string; pin: string } | null;
+  showDeleteGroup: boolean;
+  deleteConfirmation: string;
+  onGroups: () => void;
+  onSchedule: () => void;
+  onPrivacy: () => void;
+  onAbout: () => void;
+  onCreateGroup: (event: FormEvent<HTMLFormElement>) => void;
+  onGroupName: (value: string) => void;
+  onCreatedGroupDone: () => void;
+  onShowDelete: () => void;
+  onDeleteConfirmation: (value: string) => void;
+  onCancelDelete: () => void;
+  onDelete: () => void;
+};
+
+function SettingsHome(props: SettingsHomeProps) {
+  const { t } = useI18n();
+  return (
+    <>
+      <div className="screen-heading">
+        <h1>{t("Settings")}</h1>
+        <p>{props.group.name}</p>
+      </div>
+      <h2 className="settings-section-title">{t("Active group")}</h2>
+      <section className="settings-link-card">
+        <button type="button" onClick={props.onGroups}>
+          <Users size={22} />
+          <span>
+            <strong>{t("Switch group")}</strong>
+            <small>
+              {t("Your account belongs to {{count}} private groups.", {
+                count: props.groups.length,
+              })}
+            </small>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+        <button type="button" onClick={props.onSchedule}>
+          <CalendarDays size={22} />
+          <span>
+            <strong>{t("Group schedule")}</strong>
+            <small>{t("Open events and ride assignments.")}</small>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+        <button type="button" onClick={props.onPrivacy}>
+          <ShieldCheck size={22} />
+          <span>
+            <strong>{t("Privacy and consent")}</strong>
+            <small>{t("Addresses stay private to authorized rides.")}</small>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+        <button type="button" onClick={props.onAbout}>
+          <Info size={22} />
+          <span>
+            <strong>{t("About and important notice")}</strong>
+            <small>{t("What this service does—and does not—provide.")}</small>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+      </section>
+
+      <h2 className="settings-section-title">{t("Create another group")}</h2>
+      <section className="surface-card">
+        {props.createdGroup ? (
+          <GeneratedGroupPin
+            groupName={props.createdGroup.name}
+            pin={props.createdGroup.pin}
+            onContinue={props.onCreatedGroupDone}
+          />
+        ) : (
+          <form className="auth-form" onSubmit={props.onCreateGroup}>
+            <label htmlFor="new-group-name">{t("Group name")}</label>
+            <div className="auth-input-wrap">
+              <input
+                id="new-group-name"
+                required
+                maxLength={100}
+                value={props.newGroupName}
+                onChange={(event) => props.onGroupName(event.target.value)}
+                placeholder={t("Neighborhood carpool")}
+              />
+            </div>
+            <p className="auth-footnote">
+              {t("A secure 6-digit group PIN will be generated automatically.")}
+            </p>
+            <button className="primary-button" disabled={props.loading}>
+              {props.loading ? t("Creating…") : t("Create group")}
+            </button>
+          </form>
+        )}
+      </section>
+
+      {props.group.role === "owner" && (
+        <>
+          <h2 className="settings-section-title">{t("Danger zone")}</h2>
+          <section className="surface-card danger-card">
+            <div>
+              <h3>{t("Delete this group")}</h3>
+              <p className="text-muted">
+                {t(
+                  "Permanently delete this group, its roster, and all of its carpool data.",
+                )}
+              </p>
+            </div>
+            {!props.showDeleteGroup ? (
+              <button
+                className="danger-button"
+                type="button"
+                onClick={props.onShowDelete}
+              >
+                {t("Delete group")}
+              </button>
+            ) : (
+              <div className="delete-group-confirmation">
+                <label htmlFor="delete-group-confirmation">
+                  {t("Type {{name}} to confirm.", { name: props.group.name })}
+                </label>
+                <div className="auth-input-wrap">
+                  <input
+                    id="delete-group-confirmation"
+                    value={props.deleteConfirmation}
+                    onChange={(event) =>
+                      props.onDeleteConfirmation(event.target.value)
+                    }
+                  />
+                </div>
+                <div className="confirmation-actions">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={props.onCancelDelete}
+                  >
+                    {t("Cancel")}
+                  </button>
+                  <button
+                    className="danger-button"
+                    type="button"
+                    disabled={
+                      props.loading ||
+                      props.deleteConfirmation !== props.group.name
+                    }
+                    onClick={props.onDelete}
+                  >
+                    {props.loading
+                      ? t("Deleting…")
+                      : t("Permanently delete group")}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+      {props.error && <p className="auth-error">{props.error}</p>}
+    </>
   );
 }
