@@ -277,6 +277,12 @@ export const hebrew: Record<string, string> = {
   "Could not delete the group.": "לא ניתן למחוק את הקבוצה.",
   "Carpool Together": "Carpool Together",
   "Sign in to your groups": "כניסה לקבוצות שלכם",
+  "Your other groups": "הקבוצות הנוספות שלכם",
+  "Add {{group}}": "הוספת {{group}}",
+  "This phone belongs to another group. Enter that group's PIN to keep both groups in one selector.":
+    "מספר הטלפון הזה שייך לקבוצה נוספת. הזינו את הקוד שלה כדי לשמור את שתי הקבוצות באותו בורר.",
+  "PIN for {{group}}": "הקוד של {{group}}",
+  "Continue with verified groups": "המשך עם הקבוצות שאומתו",
   "Create your group": "יצירת הקבוצה שלכם",
   "Start a private group and invite members with their phone number.":
     "פתחו קבוצה פרטית והזמינו חברים באמצעות מספר הטלפון שלהם.",

@@ -16,6 +16,7 @@ const loginSchema = z.object({
   phone: z.string().min(7).max(30),
   pin: z.string().min(4).max(12),
   accessToken: z.string().min(20),
+  targetGroupId: z.string().uuid().optional(),
 });
 
 async function handleLogin(request: Request) {
@@ -36,7 +37,7 @@ async function handleLogin(request: Request) {
     );
   }
 
-  const { accessToken, phone, pin } = parsed.data;
+  const { accessToken, phone, pin, targetGroupId } = parsed.data;
   const admin = createAdminClient();
   const { data: authData, error: authError } =
     await admin.auth.getUser(accessToken);
@@ -64,7 +65,7 @@ async function handleLogin(request: Request) {
   const entries = (rosterEntries ?? []) as RosterEntry[];
   const groupIds = [...new Set(entries.map((entry) => entry.group_id))];
   const { data: groups, error: groupsError } = groupIds.length
-    ? await admin.from("groups").select("id, pin_hash").in("id", groupIds)
+    ? await admin.from("groups").select("id, name, pin_hash").in("id", groupIds)
     : { data: [], error: null };
 
   if (groupsError) {
@@ -81,7 +82,10 @@ async function handleLogin(request: Request) {
       group.pin_hash as string | null,
     ]),
   );
-  const matches = await matchingRosterEntries(entries, pinHashes, pin);
+  const loginEntries = targetGroupId
+    ? entries.filter((entry) => entry.group_id === targetGroupId)
+    : entries;
+  const matches = await matchingRosterEntries(loginEntries, pinHashes, pin);
 
   if (matches.length === 0) {
     await recordFailedLogin(admin, rateLimitHash);
@@ -136,8 +140,28 @@ async function handleLogin(request: Request) {
     );
   }
 
+  const { data: verifiedMemberships, error: verifiedMembershipsError } =
+    await admin
+      .from("group_memberships")
+      .select("group_id")
+      .eq("user_id", authData.user.id)
+      .eq("status", "active")
+      .in("group_id", groupIds);
+  if (verifiedMembershipsError) throw verifiedMembershipsError;
+
+  const verifiedGroupIds = new Set(
+    (verifiedMemberships ?? []).map((membership) => membership.group_id),
+  );
+  const unverifiedGroups = (groups ?? [])
+    .filter((group) => !verifiedGroupIds.has(group.id))
+    .map((group) => ({ id: group.id, name: group.name }));
+
   await clearFailedLogins(admin, rateLimitHash);
-  return Response.json({ ok: true, groupId: match.group_id });
+  return Response.json({
+    ok: true,
+    groupId: match.group_id,
+    unverifiedGroups,
+  });
 }
 
 export async function POST(request: Request) {
