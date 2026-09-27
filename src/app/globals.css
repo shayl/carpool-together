@@ -668,6 +668,51 @@ button:disabled {
   font-weight: 700;
 }
 
+.danger-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b42318;
+  border-radius: 0.75rem;
+  background: #b42318;
+  padding: 0.7rem 1rem;
+  color: white;
+  font-weight: 700;
+}
+
+.danger-card {
+  display: grid;
+  gap: 16px;
+  border-color: #f2b8b5;
+}
+
+.danger-card h3,
+.danger-card p {
+  margin: 0;
+}
+
+.danger-card > .danger-button {
+  justify-self: start;
+}
+
+.delete-group-confirmation {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-group-confirmation label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .primary-button {
   background: var(--team);
   color: white;

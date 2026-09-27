@@ -10,6 +10,8 @@ Carpool database or reuse that application's credentials.
 ## Current functionality
 
 - Create and switch between private database-backed groups.
+- Use group names in Hebrew, English, or other writing systems.
+- Let group owners permanently delete groups with explicit confirmation.
 - Register and create a first group without deployment-level secrets.
 - Switch between English and Hebrew with persistent RTL localization.
 - Protect each group with a private phone roster and hashed shared PIN.

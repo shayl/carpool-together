@@ -44,13 +44,6 @@ async function registerGroup(request: Request) {
   }
 
   const baseSlug = toSlug(parsed.data.groupName);
-  if (!baseSlug) {
-    return Response.json(
-      { error: "Group name must contain letters or numbers." },
-      { status: 400 },
-    );
-  }
-
   const pinHash = await bcrypt.hash(parsed.data.pin, 12);
   const slug = `${baseSlug}-${randomBytes(4).toString("hex")}`;
   const { data: groupId, error } = await admin.rpc("register_group", {

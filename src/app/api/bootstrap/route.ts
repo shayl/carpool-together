@@ -58,13 +58,6 @@ export async function POST(request: Request) {
     }
 
     const slug = toSlug(parsed.data.groupName);
-    if (!slug) {
-      return Response.json(
-        { error: "Group name must contain letters or numbers." },
-        { status: 400 },
-      );
-    }
-
     const pinHash = await bcrypt.hash(parsed.data.pin, 12);
     const { error } = await admin.rpc("bootstrap_first_group", {
       auth_user_id: authData.user.id,

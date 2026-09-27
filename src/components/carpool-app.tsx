@@ -56,6 +56,8 @@ export function CarpoolApp({
   const [csv, setCsv] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupPin, setNewGroupPin] = useState("");
+  const [showDeleteGroup, setShowDeleteGroup] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [plan, setPlan] = useState<SuggestionPlan | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,6 +93,8 @@ export function CarpoolApp({
     setError("");
     setDestination("rides");
     setSettingsPage(null);
+    setShowDeleteGroup(false);
+    setDeleteConfirmation("");
   }
 
   function switchGroupFromSettings(groupId: string) {
@@ -104,6 +108,38 @@ export function CarpoolApp({
     setDestination("rides");
     setSettingsPage(null);
     setError("");
+  }
+
+  async function deleteGroup() {
+    if (deleteConfirmation !== group.name) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/groups/${group.id}`, {
+        method: "DELETE",
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          result.error ? t(result.error) : t("Could not delete the group."),
+        );
+      }
+
+      const nextGroup = groups.find((item) => item.id !== group.id);
+      if (nextGroup) setActiveGroupId(nextGroup.id);
+      setShowDeleteGroup(false);
+      setDeleteConfirmation("");
+      setDestination(nextGroup ? "settings" : "rides");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : t("Could not delete the group."),
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function importRoster() {
@@ -587,6 +623,7 @@ export function CarpoolApp({
               </button>
               {error && <p className="error">{error}</p>}
             </section>
+
               </>
             )}
           </>
@@ -784,6 +821,77 @@ export function CarpoolApp({
               </form>
               {error && <p className="error">{error}</p>}
             </section>
+
+            {group.role === "owner" && (
+              <>
+                <h2 className="settings-section-title">{t("Danger zone")}</h2>
+                <section className="surface-card danger-card">
+                  <div>
+                    <h3>{t("Delete this group")}</h3>
+                    <p className="text-muted">
+                      {t(
+                        "Permanently delete this group, its roster, and all of its carpool data.",
+                      )}
+                    </p>
+                  </div>
+                  {!showDeleteGroup ? (
+                    <button
+                      className="danger-button"
+                      type="button"
+                      onClick={() => {
+                        setShowDeleteGroup(true);
+                        setError("");
+                      }}
+                    >
+                      {t("Delete group")}
+                    </button>
+                  ) : (
+                    <div className="delete-group-confirmation">
+                      <label htmlFor="delete-group-confirmation">
+                        {t("Type {{name}} to confirm.", { name: group.name })}
+                      </label>
+                      <div className="auth-input-wrap">
+                        <input
+                          id="delete-group-confirmation"
+                          autoComplete="off"
+                          value={deleteConfirmation}
+                          onChange={(event) =>
+                            setDeleteConfirmation(event.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="confirmation-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={loading}
+                          onClick={() => {
+                            setShowDeleteGroup(false);
+                            setDeleteConfirmation("");
+                            setError("");
+                          }}
+                        >
+                          {t("Cancel")}
+                        </button>
+                        <button
+                          className="danger-button"
+                          type="button"
+                          disabled={
+                            loading || deleteConfirmation !== group.name
+                          }
+                          onClick={deleteGroup}
+                        >
+                          {loading
+                            ? t("Deleting…")
+                            : t("Permanently delete group")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {error && <p className="error">{error}</p>}
+                </section>
+              </>
+            )}
           </>
         )}
 
