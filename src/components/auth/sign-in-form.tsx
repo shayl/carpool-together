@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -113,7 +114,8 @@ export function SignInForm() {
           </p>
         )}
         <p className="auth-footnote">
-          Ask a group organizer if you do not know the PIN.
+          Ask a group organizer if you do not know the PIN.{" "}
+          <Link href="/privacy">Privacy notice</Link>
         </p>
       </section>
     </main>

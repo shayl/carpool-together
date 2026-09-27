@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -141,6 +142,10 @@ export function SetupForm() {
             {error}
           </p>
         )}
+        <p className="auth-footnote">
+          By setting up a group, you agree to handle roster information
+          responsibly. <Link href="/privacy">Privacy notice</Link>
+        </p>
       </section>
     </main>
   );
