@@ -49,7 +49,9 @@ npm run build
 4. Apply the migration only to the Carpool Together project.
 5. Enable anonymous sign-ins in Supabase Auth.
 6. Add the project's server-only secret key as `SUPABASE_SECRET_KEY`.
-7. Add a server-only data access layer before replacing the fictional
+7. Set a strong one-time `BOOTSTRAP_SECRET` and use the first-group setup
+   screen.
+8. Add a server-only data access layer before replacing the fictional
    in-memory data.
 
 ## Current limitations
