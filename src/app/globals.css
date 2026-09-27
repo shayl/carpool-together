@@ -319,19 +319,6 @@ button:disabled {
   line-height: 1.5;
 }
 
-.developer-credit {
-  color: var(--muted);
-  font-size: 12px;
-  text-align: center;
-}
-
-.developer-credit a,
-.app-version a {
-  color: var(--team);
-  font-weight: 700;
-  text-underline-offset: 2px;
-}
-
 .auth-switch {
   display: grid;
   gap: 6px;

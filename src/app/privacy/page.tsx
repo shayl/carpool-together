@@ -44,12 +44,6 @@ export default function PrivacyPage() {
         <Link className="primary-button" href="/">
           {t("Return to the app")}
         </Link>
-        <p className="developer-credit">
-          {t("Developed by")}{" "}
-          <a href="https://github.com/shayl" rel="me">
-            @shayl
-          </a>
-        </p>
       </article>
     </main>
   );

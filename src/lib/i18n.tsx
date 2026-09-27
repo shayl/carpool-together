@@ -116,7 +116,6 @@ const hebrew: Record<string, string> = {
   "Create group": "יצירת קבוצה",
   "Could not create the group.": "לא ניתן ליצור את הקבוצה.",
   "Carpool Together": "Carpool Together",
-  "Developed by": "פותח על ידי",
   "Sign in to your groups": "כניסה לקבוצות שלכם",
   "Create your group": "יצירת הקבוצה שלכם",
   "Start a private group and invite members with their phone number.":

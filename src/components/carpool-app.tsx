@@ -787,12 +787,7 @@ export function CarpoolApp({
           </>
         )}
 
-        <footer className="app-version">
-          Carpool Together · {t("Developed by")}{" "}
-          <a href="https://github.com/shayl" rel="me">
-            @shayl
-          </a>
-        </footer>
+        <footer className="app-version">Carpool Together</footer>
       </main>
     </div>
   );
