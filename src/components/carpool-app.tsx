@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   CalendarDays,
+  BookOpen,
   Car,
   ChevronDown,
   Heart,
@@ -19,6 +20,8 @@ import { useRouter } from "next/navigation";
 import { AppVersion } from "@/components/app-version";
 import { GeneratedGroupPin } from "@/components/generated-group-pin";
 import { GroupPinSettings } from "@/components/group-pin-settings";
+import { InstallAppCard } from "@/components/install-app-card";
+import { PushReminderSettings } from "@/components/push-reminder-settings";
 import { MemberAvatar } from "@/components/member-avatar";
 import { ScheduleViews } from "@/components/schedule-views";
 import type { AppGroup } from "@/lib/app-data";
@@ -26,7 +29,7 @@ import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/browser";
 
 type Destination = "rides" | "family" | "team" | "settings";
-type SettingsPage = "about" | "groups" | null;
+type SettingsPage = "about" | "groups" | "help" | null;
 
 const destinations = [
   { id: "rides", label: "Rides", icon: Car },
@@ -630,6 +633,9 @@ export function CarpoolApp({
             onGroup={(groupId) => switchGroup(groupId, "settings")}
           />
         )}
+        {destination === "settings" && settingsPage === "help" && (
+          <HelpSettings onBack={() => setSettingsPage(null)} />
+        )}
         {destination === "settings" && settingsPage === null && (
           <SettingsHome
             group={group}
@@ -643,6 +649,7 @@ export function CarpoolApp({
             onGroups={() => setSettingsPage("groups")}
             onSchedule={() => setDestination("rides")}
             onPrivacy={() => router.push("/privacy")}
+            onHelp={() => setSettingsPage("help")}
             onAbout={() => setSettingsPage("about")}
             onCreateGroup={createGroup}
             onGroupName={setNewGroupName}
@@ -714,6 +721,53 @@ function AboutSettings({ onBack }: { onBack: () => void }) {
   );
 }
 
+function HelpSettings({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n();
+  const sections = [
+    [
+      "Rides and drivers",
+      "Open an event on Rides to see each required direction. A happy car means every ride has a driver; a sad car means at least one still needs help.",
+    ],
+    [
+      "Attendance and absences",
+      "Tap a member avatar on an event to change that day. Use My family to add a multi-day absence.",
+    ],
+    [
+      "Maps and routes",
+      "Open an assigned ride to launch Google Maps, Apple Maps, or Waze. Group members can see household addresses needed for pickups.",
+    ],
+    [
+      "Install and notifications",
+      "Install Carpool Together from Settings for quick Home Screen access. Each adult can enable reminders on their own device.",
+    ],
+    [
+      "Something looks out of date",
+      "Check that this device is online, then refresh the app. Confirm the event date and member status before changing it again.",
+    ],
+  ] as const;
+
+  return (
+    <>
+      <button className="text-button back-button" type="button" onClick={onBack}>
+        <ArrowLeft size={18} />
+        {t("Settings")}
+      </button>
+      <div className="screen-heading">
+        <h1>{t("Help")}</h1>
+        <p>{t("Quick answers for planning and driving carpools.")}</p>
+      </div>
+      <div className="help-sections">
+        {sections.map(([title, copy]) => (
+          <section className="surface-card" key={title}>
+            <h2>{t(title)}</h2>
+            <p className="text-muted">{t(copy)}</p>
+          </section>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function GroupSettings({
   groups,
   activeGroupId,
@@ -779,6 +833,7 @@ type SettingsHomeProps = {
   onGroups: () => void;
   onSchedule: () => void;
   onPrivacy: () => void;
+  onHelp: () => void;
   onAbout: () => void;
   onCreateGroup: (event: FormEvent<HTMLFormElement>) => void;
   onGroupName: (value: string) => void;
@@ -902,6 +957,23 @@ function SettingsHome(props: SettingsHomeProps) {
           <span>
             <strong>{t("About and important notice")}</strong>
             <small>{t("What this service does—and does not—provide.")}</small>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+      </section>
+
+      <h2 className="settings-section-title">{t("App and notifications")}</h2>
+      <InstallAppCard />
+      <PushReminderSettings />
+      <h2 className="settings-section-title">{t("Help and information")}</h2>
+      <section className="settings-link-card">
+        <button type="button" onClick={props.onHelp}>
+          <BookOpen size={22} />
+          <span>
+            <strong>{t("Help")}</strong>
+            <small>
+              {t("Using rides, attendance, notifications, and maps.")}
+            </small>
           </span>
           <span aria-hidden="true">›</span>
         </button>

@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   type ReactNode,
   useContext,
   useEffect,
@@ -12,6 +13,95 @@ type Locale = "en" | "he";
 type Replacements = Record<string, string | number>;
 
 export const hebrew: Record<string, string> = {
+  "App and notifications": "אפליקציה והתראות",
+  "Install app": "התקנת האפליקציה",
+  "Help and information": "עזרה ומידע",
+  Help: "עזרה",
+  "Quick answers for planning and driving carpools.":
+    "תשובות מהירות לתכנון ולביצוע הסעות.",
+  "Using rides, attendance, notifications, and maps.":
+    "שימוש בנסיעות, נוכחות, התראות ומפות.",
+  "Add Carpool Together to your Home Screen for quick, full-screen access.":
+    "הוסיפו את Carpool Together למסך הבית לגישה מהירה במסך מלא.",
+  "Installed. Carpool Together opens from your Home Screen.":
+    "האפליקציה מותקנת וניתן לפתוח אותה ממסך הבית.",
+  "Installation started. Open Carpool Together from its new app icon.":
+    "ההתקנה החלה. פתחו את Carpool Together מהסמל החדש.",
+  "Installation was canceled. You can try again anytime.":
+    "ההתקנה בוטלה. אפשר לנסות שוב בכל עת.",
+  "Open this page in Safari.": "פתחו את הדף הזה ב-Safari.",
+  "Tap Share.": "לחצו על שיתוף.",
+  "Choose Add to Home Screen, then tap Add.":
+    "בחרו הוספה למסך הבית ואז לחצו על הוספה.",
+  "Open your browser menu and choose Install app or Add to Home screen.":
+    "פתחו את תפריט הדפדפן ובחרו התקנת אפליקציה או הוספה למסך הבית.",
+  "Rides and drivers": "נסיעות ונהגים",
+  "Open an event on Rides to see each required direction. A happy car means every ride has a driver; a sad car means at least one still needs help.":
+    "פתחו אירוע בנסיעות כדי לראות כל כיוון נדרש. רכב שמח אומר שלכל נסיעה יש נהג; רכב עצוב אומר שלפחות נסיעה אחת עדיין זקוקה לעזרה.",
+  "Attendance and absences": "נוכחות והיעדרויות",
+  "Tap a member avatar on an event to change that day. Use My family to add a multi-day absence.":
+    "לחצו על תמונת חבר באירוע כדי לשנות את אותו יום. השתמשו במשפחה שלי כדי להוסיף היעדרות למספר ימים.",
+  "Maps and routes": "מפות ומסלולים",
+  "Open an assigned ride to launch Google Maps, Apple Maps, or Waze. Group members can see household addresses needed for pickups.":
+    "פתחו נסיעה ששובצה כדי להפעיל את Google Maps, Apple Maps או Waze. חברי הקבוצה יכולים לראות את כתובות המשפחות הנדרשות לאיסוף.",
+  "Install and notifications": "התקנה והתראות",
+  "Install Carpool Together from Settings for quick Home Screen access. Each adult can enable reminders on their own device.":
+    "התקינו את Carpool Together מההגדרות לגישה מהירה ממסך הבית. כל מבוגר יכול להפעיל תזכורות במכשיר שלו.",
+  "Something looks out of date": "משהו לא מעודכן",
+  "Check that this device is online, then refresh the app. Confirm the event date and member status before changing it again.":
+    "ודאו שהמכשיר מחובר לאינטרנט ורעננו את האפליקציה. בדקו את תאריך האירוע ומצב החבר לפני שינוי נוסף.",
+  "Driver reminders": "תזכורות לנהגים",
+  "Each adult chooses a reminder time on every device. Reminders are sent only for rides their family is driving.":
+    "כל מבוגר בוחר זמן תזכורת בכל מכשיר. תזכורות נשלחות רק לנסיעות שהמשפחה שלו מסיעה.",
+  "This browser does not support app notifications.":
+    "הדפדפן הזה אינו תומך בהתראות אפליקציה.",
+  "On iPhone and iPad, install the app first, then open it from the Home Screen.":
+    "ב-iPhone וב-iPad יש להתקין תחילה את האפליקציה ואז לפתוח אותה ממסך הבית.",
+  "Notifications are blocked. Enable them in this device's settings.":
+    "ההתראות חסומות. הפעילו אותן בהגדרות המכשיר.",
+  "Remind me before pickup": "הזכירו לי לפני האיסוף",
+  "Enable reminders": "הפעלת תזכורות",
+  "Enabling…": "מפעילים…",
+  "Send test": "שליחת בדיקה",
+  "Disable on this device": "השבתה במכשיר הזה",
+  "Driver reminders are enabled on this device.":
+    "תזכורות לנהגים מופעלות במכשיר הזה.",
+  "Reminders are disabled on this device.":
+    "התזכורות מושבתות במכשיר הזה.",
+  "Test reminder sent. Check this device's notifications.":
+    "נשלחה תזכורת לבדיקה. בדקו את ההתראות במכשיר.",
+  "This device will remind you {{lead}} before pickup.":
+    "המכשיר יזכיר לכם {{lead}} לפני האיסוף.",
+  "Could not check reminder status.": "לא ניתן לבדוק את מצב התזכורות.",
+  "Could not enable reminders.": "לא ניתן להפעיל תזכורות.",
+  "Could not change reminder time.": "לא ניתן לשנות את זמן התזכורת.",
+  "Could not send a test reminder.": "לא ניתן לשלוח תזכורת לבדיקה.",
+  "Could not disable reminders.": "לא ניתן להשבית תזכורות.",
+  "Driver reminders are not configured yet.":
+    "תזכורות לנהגים עדיין אינן מוגדרות.",
+  "This device is not subscribed.": "המכשיר הזה אינו רשום להתראות.",
+  "Enable reminders on this device first.":
+    "הפעילו תחילה תזכורות במכשיר הזה.",
+  "The test reminder could not be delivered.":
+    "לא ניתן היה למסור את תזכורת הבדיקה.",
+  "Reminder dispatcher authorization failed.":
+    "אימות שירות שליחת התזכורות נכשל.",
+  "Reconnect before enabling reminders.":
+    "התחברו מחדש לאינטרנט לפני הפעלת תזכורות.",
+  "Reconnect before changing reminder time.":
+    "התחברו מחדש לאינטרנט לפני שינוי זמן התזכורת.",
+  "Add the app to your Home Screen and open it from the icon before enabling reminders.":
+    "הוסיפו את האפליקציה למסך הבית ופתחו אותה מהסמל לפני הפעלת התזכורות.",
+  "Notifications are blocked in this device's settings.":
+    "ההתראות חסומות בהגדרות המכשיר.",
+  "Notification permission was not granted.": "לא ניתנה הרשאה להתראות.",
+  "Notification settings could not be updated.":
+    "לא ניתן לעדכן את הגדרות ההתראות.",
+  "15 minutes": "15 דקות",
+  "30 minutes": "30 דקות",
+  "1 hour": "שעה",
+  "1 hour 30 minutes": "שעה ו-30 דקות",
+  "2 hours": "שעתיים",
   "Skip to content": "דלגו לתוכן",
   "Active group": "קבוצה פעילה",
   "Sign out": "התנתקות",
@@ -488,14 +578,21 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     document.documentElement.dir = locale === "he" ? "rtl" : "ltr";
   }, [locale]);
 
-  const toggleLocale = () =>
-    setStoredLocale(locale === "en" ? "he" : "en");
+  const t = useCallback(
+    (key: string, replacements?: Replacements) =>
+      translate(locale, key, replacements),
+    [locale],
+  );
+  const toggleLocale = useCallback(
+    () => setStoredLocale(locale === "en" ? "he" : "en"),
+    [locale],
+  );
 
   return (
     <I18nContext.Provider
       value={{
         locale,
-        t: (key, replacements) => translate(locale, key, replacements),
+        t,
         toggleLocale,
       }}
     >
