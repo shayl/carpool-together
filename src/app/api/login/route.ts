@@ -137,7 +137,7 @@ async function handleLogin(request: Request) {
   }
 
   await clearFailedLogins(admin, rateLimitHash);
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, groupId: match.group_id });
 }
 
 export async function POST(request: Request) {

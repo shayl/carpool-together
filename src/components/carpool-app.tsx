@@ -230,13 +230,20 @@ export function CarpoolApp({
       });
       const result = (await response.json().catch(() => null)) as {
         error?: string;
+        groupId?: string;
       } | null;
       if (!response.ok) {
         throw new Error(result?.error ?? t("Could not add the group."));
       }
+      if (!result?.groupId) {
+        throw new Error(t("Could not add the group."));
+      }
 
       setExistingGroupPhone("");
       setExistingGroupPin("");
+      setActiveGroupId(result.groupId);
+      setDestination("rides");
+      setSettingsPage(null);
       router.refresh();
     } catch (caught) {
       setError(
