@@ -822,8 +822,17 @@ button:disabled {
   justify-items: center;
   gap: 4px;
   max-width: 64px;
+  border: 0;
+  background: transparent;
   color: var(--foreground);
   font-size: 12px;
+}
+
+.member-avatar-item:hover .member-avatar,
+.member-avatar-item:focus-visible .member-avatar {
+  box-shadow:
+    inset 0 0 0 2px white,
+    0 0 0 3px var(--team);
 }
 
 .member-avatar-item > span:last-child {
@@ -853,6 +862,140 @@ button:disabled {
   min-width: 0;
   align-items: center;
   gap: 8px;
+}
+
+.participant-status-sheet,
+.route-sheet {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  align-items: end;
+}
+
+.participant-status-backdrop {
+  position: absolute;
+  inset: 0;
+  background: #1f172c80;
+}
+
+.participant-status-panel,
+.route-sheet-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(100%, 560px);
+  max-height: min(82vh, 720px);
+  gap: 14px;
+  overflow-y: auto;
+  margin: 0 auto;
+  border-radius: 24px 24px 0 0;
+  background: white;
+  padding: 22px;
+  box-shadow: 0 -12px 40px #251d3330;
+}
+
+.status-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 13px;
+}
+
+.status-choice input {
+  width: 20px;
+  height: 20px;
+}
+
+.status-choice span,
+.status-choice strong,
+.status-choice small {
+  display: block;
+}
+
+.status-choice small {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.ride-address-list {
+  display: grid;
+  gap: 7px;
+  border-radius: 12px;
+  background: #f7f5fa;
+  padding: 10px 12px;
+}
+
+.ride-address-list address {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.ride-address-list address span {
+  color: var(--muted);
+}
+
+.route-launcher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.route-launcher .auth-error {
+  flex-basis: 100%;
+}
+
+.route-provider-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.route-stops {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route-stops li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  border-radius: 12px;
+  background: #f7f5fa;
+  padding: 10px;
+}
+
+.route-stops li > strong {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--team);
+  color: white;
+  font-size: 12px;
+}
+
+.route-stops span,
+.route-stops b,
+.route-stops small {
+  display: block;
+}
+
+.route-stops small {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.route-stops .route-stop-current {
+  background: color-mix(in srgb, var(--team) 10%, white);
 }
 
 .attendance-row label,
@@ -982,6 +1125,42 @@ button:disabled {
 
 .group-icon-preview {
   border-radius: 16px;
+}
+
+.household-address-list {
+  display: grid;
+  gap: 0;
+}
+
+.household-address-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding: 13px 0;
+}
+
+.household-address-row:first-child {
+  border-top: 0;
+}
+
+.household-address-row address {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.household-address-editor {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.household-address-editor .input {
+  flex: 1 1 240px;
 }
 
 .schedule-form {

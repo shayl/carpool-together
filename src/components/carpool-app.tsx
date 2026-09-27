@@ -891,7 +891,9 @@ function SettingsHome(props: SettingsHomeProps) {
           <ShieldCheck size={22} />
           <span>
             <strong>{t("Privacy and consent")}</strong>
-            <small>{t("Addresses stay private to authorized rides.")}</small>
+            <small>
+              {t("Group members can view household addresses for driving and routes.")}
+            </small>
           </span>
           <span aria-hidden="true">›</span>
         </button>

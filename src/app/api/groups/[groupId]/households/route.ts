@@ -58,6 +58,8 @@ export async function PATCH(
         ...(input.data.name !== undefined && { name: input.data.name }),
         ...(input.data.address !== undefined && {
           address: input.data.address,
+          latitude: null,
+          longitude: null,
         }),
         ...(input.data.latitude !== undefined && {
           latitude: input.data.latitude,

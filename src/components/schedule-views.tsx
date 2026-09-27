@@ -21,8 +21,10 @@ import {
   MapPin,
   Pencil,
   Plus,
+  Route,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -43,6 +45,12 @@ import {
   coverageMood,
   RideStatusCar,
 } from "@/components/ride-status-car";
+import {
+  googleRouteUrl,
+  singleStopUrl,
+  type NavigationProvider,
+} from "@/lib/navigation-links";
+import type { GeoStop } from "@/lib/route-optimizer";
 import type {
   EventType,
   GroupEvent,
@@ -439,6 +447,12 @@ function EventCard({
   const location = schedule.locations.find(
     (item) => item.id === event.locationId,
   );
+  const [selectedParticipantId, setSelectedParticipantId] = useState<
+    string | null
+  >(null);
+  const selectedParticipant = schedule.participants.find(
+    (participant) => participant.id === selectedParticipantId,
+  );
   const coverage = eventCoverage(schedule, event);
   const openRides = requiredLegs(event).filter(
     (leg) => rideState(schedule, event, leg).open,
@@ -489,12 +503,16 @@ function EventCard({
                 participant,
               );
               return (
-                <span
+                <button
+                  type="button"
                   className={
                     attendance.absent ? "member-avatar-item is-inactive" : "member-avatar-item"
                   }
                   key={participant.id}
-                  title={participant.name}
+                  aria-label={t("Change ride status for {{name}}", {
+                    name: participant.name,
+                  })}
+                  onClick={() => setSelectedParticipantId(participant.id)}
                 >
                   <MemberAvatar
                     name={participant.name}
@@ -502,7 +520,7 @@ function EventCard({
                     size={40}
                   />
                   <span>{participant.name.split(/\s+/)[0]}</span>
-                </span>
+                </button>
               );
             })}
           </div>
@@ -515,11 +533,15 @@ function EventCard({
               mutation={mutation}
             />
           ))}
-          <AttendancePanel
-            event={event}
-            schedule={schedule}
-            mutation={mutation}
-          />
+          {selectedParticipant && (
+            <ParticipantStatusEditor
+              event={event}
+              participant={selectedParticipant}
+              schedule={schedule}
+              mutation={mutation}
+              onClose={() => setSelectedParticipantId(null)}
+            />
+          )}
         </div>
       )}
     </article>
@@ -543,6 +565,18 @@ function RideLegPanel({
     schedule.currentHouseholdId ?? schedule.households[0]?.id ?? "",
   );
   if (!ride.active) return null;
+  const riderHouseholds = [
+    ...new Map(
+      ride.participants
+        .map((participant) =>
+          schedule.households.find(
+            (household) => household.id === participant.householdId,
+          ),
+        )
+        .filter((household) => household && household.id !== ride.household?.id)
+        .map((household) => [household!.id, household!]),
+    ).values(),
+  ];
 
   return (
     <section className="ride-leg-panel">
@@ -607,94 +641,388 @@ function RideLegPanel({
       <p className="rider-list">
         {ride.participants.map((participant) => participant.name).join(", ")}
       </p>
+      <div className="ride-address-list">
+        {ride.household && (
+          <address>
+            <strong>{t("Driver: {{name}}", { name: ride.household.name })}</strong>
+            <span>{ride.household.address || t("No address added")}</span>
+          </address>
+        )}
+        {riderHouseholds.map((household) => (
+          <address key={household.id}>
+            <strong>{household.name}</strong>
+            <span>{household.address || t("No address added")}</span>
+          </address>
+        ))}
+      </div>
+      {ride.claim && (
+        <RouteLauncher groupId={event.groupId} event={event} leg={leg} />
+      )}
     </section>
   );
 }
 
-function AttendancePanel({
+function RouteLauncher({
+  groupId,
   event,
-  schedule,
-  mutation,
+  leg,
 }: {
+  groupId: string;
   event: GroupEvent;
-  schedule: GroupSchedule;
-  mutation: ReturnType<typeof useMutation>;
+  leg: RideLeg;
 }) {
   const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [route, setRoute] = useState<GeoStop[] | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [sequentialProvider, setSequentialProvider] = useState<
+    Exclude<NavigationProvider, "google"> | null
+  >(null);
+  const [nextStopIndex, setNextStopIndex] = useState(1);
+
+  function navigationTarget() {
+    const mobile =
+      window.matchMedia("(pointer: coarse)").matches ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return mobile ? "_self" : "_blank";
+  }
+
+  async function loadRoute() {
+    const response = await fetch(`/api/groups/${groupId}/routes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: event.id, leg }),
+    });
+    const result = (await response.json().catch(() => null)) as {
+      error?: string;
+      stops?: GeoStop[];
+    } | null;
+    if (!response.ok || !result?.stops) {
+      throw new Error(result?.error ?? t("Could not build route."));
+    }
+    setRoute(result.stops);
+    return result.stops;
+  }
+
+  async function openRoute(forceChoice = false) {
+    setBusy(true);
+    setError("");
+    try {
+      if (!navigator.onLine) throw new Error(t("Reconnect to open a route."));
+      const preference = window.localStorage.getItem(
+        "carpool-navigation-provider",
+      );
+      const saved =
+        preference === "google" ||
+        preference === "apple" ||
+        preference === "waze"
+          ? preference
+          : null;
+      const stops = route ?? (await loadRoute());
+      if (stops.length < 2) {
+        throw new Error(t("The route needs a start and destination."));
+      }
+      if (forceChoice || !saved) {
+        setChoosing(true);
+      } else {
+        launchProvider(saved, stops);
+      }
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? t(caught.message)
+          : t("Could not build route."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function launchProvider(provider: NavigationProvider, stops: GeoStop[]) {
+    window.localStorage.setItem("carpool-navigation-provider", provider);
+    setChoosing(false);
+    if (provider === "google") {
+      window.open(googleRouteUrl(stops), navigationTarget(), "noopener,noreferrer");
+      return;
+    }
+    setSequentialProvider(provider);
+    setNextStopIndex(2);
+    window.open(
+      singleStopUrl(provider, stops[1]),
+      navigationTarget(),
+      "noopener,noreferrer",
+    );
+  }
+
+  function openNextStop() {
+    if (!route || !sequentialProvider || nextStopIndex >= route.length) return;
+    window.open(
+      singleStopUrl(sequentialProvider, route[nextStopIndex]),
+      navigationTarget(),
+      "noopener,noreferrer",
+    );
+    setNextStopIndex((current) => current + 1);
+  }
 
   return (
-    <section className="attendance-panel">
-      <h3>{t("Attendance and ride needs")}</h3>
-      {schedule.participants.map((participant) => {
-        const attendance = effectiveAttendance(schedule, event, participant);
-        const save = (patch: Partial<typeof attendance>) =>
-          mutation.mutate(
-            "attendance",
-            "PUT",
-            {
-              eventId: event.id,
-              participantId: participant.id,
-              absent: attendance.absent,
-              optOutTo: attendance.optOutTo,
-              optOutFrom: attendance.optOutFrom,
-              ...patch,
-            },
-            `attendance-${event.id}-${participant.id}`,
-          );
-        return (
-          <div className="attendance-row" key={participant.id}>
-            <span className="attendance-member">
-              <MemberAvatar
-                name={participant.name}
-                photoUrl={participant.photoUrl}
-                size={32}
-              />
-              <strong>{participant.name}</strong>
-            </span>
-            <label>
-              <input
-                type="checkbox"
-                checked={attendance.absent}
-                onChange={(input) =>
-                  save({
-                    absent: input.target.checked,
-                    optOutTo: input.target.checked || attendance.optOutTo,
-                    optOutFrom:
-                      input.target.checked || attendance.optOutFrom,
-                  })
-                }
-              />
-              {t("Absent")}
-            </label>
-            {event.needsTo && (
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!attendance.optOutTo && !attendance.absent}
-                  disabled={attendance.absent}
-                  onChange={(input) =>
-                    save({ optOutTo: !input.target.checked })
-                  }
-                />
-                {t("Needs ride there")}
-              </label>
-            )}
-            {event.needsFrom && (
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!attendance.optOutFrom && !attendance.absent}
-                  disabled={attendance.absent}
-                  onChange={(input) =>
-                    save({ optOutFrom: !input.target.checked })
-                  }
-                />
-                {t("Needs ride home")}
-              </label>
+    <div className="route-launcher">
+      <button
+        className="text-button"
+        type="button"
+        disabled={busy}
+        onClick={() => void openRoute()}
+      >
+        <Route size={17} />
+        {busy ? t("Preparing route…") : t("Open route")}
+      </button>
+      <button
+        className="text-button"
+        type="button"
+        disabled={busy}
+        onClick={() => void openRoute(true)}
+      >
+        {t("Change maps app")}
+      </button>
+      {error && <p className="auth-error">{error}</p>}
+      {choosing && route && (
+        <section
+          className="route-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("Choose your maps app")}
+        >
+          <div
+            className="participant-status-backdrop"
+            onClick={() => setChoosing(false)}
+          />
+          <div className="route-sheet-panel">
+            <div className="card-heading">
+              <h3>{t("Choose your maps app")}</h3>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label={t("Close")}
+                onClick={() => setChoosing(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="text-muted">
+              {t(
+                "Google Maps opens every stop. Apple Maps and Waze guide one stop at a time.",
+              )}
+            </p>
+            <RouteStops stops={route} />
+            <div className="route-provider-actions">
+              {(["google", "apple", "waze"] as NavigationProvider[]).map(
+                (provider) => (
+                  <button
+                    className="primary-button"
+                    type="button"
+                    key={provider}
+                    onClick={() => launchProvider(provider, route)}
+                  >
+                    {provider === "google"
+                      ? "Google Maps"
+                      : provider === "apple"
+                        ? "Apple Maps"
+                        : "Waze"}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+      {sequentialProvider && route && (
+        <section
+          className="route-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("Route stops")}
+        >
+          <div
+            className="participant-status-backdrop"
+            onClick={() => setSequentialProvider(null)}
+          />
+          <div className="route-sheet-panel">
+            <div className="card-heading">
+              <h3>
+                {sequentialProvider === "apple" ? "Apple Maps" : "Waze"}
+              </h3>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label={t("Close")}
+                onClick={() => setSequentialProvider(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="text-muted">
+              {t(
+                "Return here when you are ready for the next stop. Opening a stop does not mark arrival.",
+              )}
+            </p>
+            <RouteStops stops={route} currentIndex={nextStopIndex - 1} />
+            {nextStopIndex < route.length ? (
+              <button
+                className="primary-button"
+                type="button"
+                onClick={openNextStop}
+              >
+                {t("Open next stop: {{name}}", {
+                  name: route[nextStopIndex].label,
+                })}
+              </button>
+            ) : (
+              <p className="auth-message">{t("Final destination opened")}</p>
             )}
           </div>
-        );
-      })}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function RouteStops({
+  stops,
+  currentIndex,
+}: {
+  stops: GeoStop[];
+  currentIndex?: number;
+}) {
+  const { t } = useI18n();
+  return (
+    <ol className="route-stops">
+      {stops.map((stop, index) => (
+        <li
+          className={index === currentIndex ? "route-stop-current" : ""}
+          key={`${stop.label}-${index}`}
+        >
+          <strong>{index + 1}</strong>
+          <span>
+            <b>{stop.label}</b>
+            <small>{stop.address}</small>
+            {index === 0 && <small>{t("Starting point")}</small>}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function ParticipantStatusEditor({
+  event,
+  participant,
+  schedule,
+  mutation,
+  onClose,
+}: {
+  event: GroupEvent;
+  participant: GroupSchedule["participants"][number];
+  schedule: GroupSchedule;
+  mutation: ReturnType<typeof useMutation>;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const attendance = effectiveAttendance(schedule, event, participant);
+  const save = (patch: Partial<typeof attendance>) =>
+    mutation.mutate(
+      "attendance",
+      "PUT",
+      {
+        eventId: event.id,
+        participantId: participant.id,
+        absent: attendance.absent,
+        optOutTo: attendance.optOutTo,
+        optOutFrom: attendance.optOutFrom,
+        ...patch,
+      },
+      `attendance-${event.id}-${participant.id}`,
+    );
+
+  return (
+    <section
+      className="participant-status-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("Ride status for {{name}}", { name: participant.name })}
+    >
+      <div className="participant-status-backdrop" onClick={onClose} />
+      <div className="participant-status-panel">
+        <div className="card-heading">
+          <span className="attendance-member">
+            <MemberAvatar
+              name={participant.name}
+              photoUrl={participant.photoUrl}
+              size={48}
+            />
+            <span>
+              <strong>{participant.name}</strong>
+              <small>{t("Attendance and ride needs")}</small>
+            </span>
+          </span>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={t("Close")}
+            onClick={onClose}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <label className="status-choice">
+          <input
+            type="checkbox"
+            checked={attendance.absent}
+            onChange={(input) =>
+              save({
+                absent: input.target.checked,
+                optOutTo: input.target.checked || attendance.optOutTo,
+                optOutFrom: input.target.checked || attendance.optOutFrom,
+              })
+            }
+          />
+          <span>
+            <strong>{t("Absent")}</strong>
+            <small>{t("Not attending this event")}</small>
+          </span>
+        </label>
+        {event.needsTo && (
+          <label className="status-choice">
+            <input
+              type="checkbox"
+              checked={!attendance.optOutTo && !attendance.absent}
+              disabled={attendance.absent}
+              onChange={(input) => save({ optOutTo: !input.target.checked })}
+            />
+            <span>
+              <strong>{t("Needs ride there")}</strong>
+              <small>{t("Include this member in the outbound ride")}</small>
+            </span>
+          </label>
+        )}
+        {event.needsFrom && (
+          <label className="status-choice">
+            <input
+              type="checkbox"
+              checked={!attendance.optOutFrom && !attendance.absent}
+              disabled={attendance.absent}
+              onChange={(input) => save({ optOutFrom: !input.target.checked })}
+            />
+            <span>
+              <strong>{t("Needs ride home")}</strong>
+              <small>{t("Include this member in the return ride")}</small>
+            </span>
+          </label>
+        )}
+        <button className="secondary-button" type="button" onClick={onClose}>
+          {t("Done")}
+        </button>
+      </div>
     </section>
   );
 }
@@ -755,7 +1083,7 @@ function FamilySchedule({ groupId, schedule }: Props) {
               await mutation.mutate(
                 "households",
                 "PATCH",
-                { address },
+                { address, latitude: null, longitude: null },
                 "save-address",
               );
             }}
@@ -1164,6 +1492,41 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
       <section className="surface-card">
         <div className="card-heading">
           <div>
+            <h2>{t("Household addresses")}</h2>
+            <p className="text-muted">
+              {t("Visible to group members for pickups and driving routes.")}
+            </p>
+          </div>
+          <MapPin size={22} />
+        </div>
+        <div className="household-address-list">
+          {schedule.households.map((household) => (
+            <HouseholdAddressRow
+              key={household.id}
+              household={household}
+              canManage={canManage}
+              busy={Boolean(mutation.busyKey)}
+              onSave={(address) =>
+                mutation.mutate(
+                  "households",
+                  "PATCH",
+                  {
+                    householdId: household.id,
+                    address,
+                    latitude: null,
+                    longitude: null,
+                  },
+                  `household-${household.id}`,
+                )
+              }
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="surface-card">
+        <div className="card-heading">
+          <div>
             <h2>{t("Drive counts")}</h2>
             <p className="text-muted">
               {t("One count per active assigned ride.")}
@@ -1181,6 +1544,74 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
       {mutation.error && <p className="auth-error">{mutation.error}</p>}
       {mutation.message && <p className="auth-message">{mutation.message}</p>}
     </>
+  );
+}
+
+function HouseholdAddressRow({
+  household,
+  canManage,
+  busy,
+  onSave,
+}: {
+  household: GroupSchedule["households"][number];
+  canManage: boolean;
+  busy: boolean;
+  onSave: (address: string) => Promise<boolean>;
+}) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [address, setAddress] = useState(household.address);
+
+  return (
+    <div className="household-address-row">
+      <div>
+        <strong>{household.name}</strong>
+        <address>{household.address || t("No address added")}</address>
+      </div>
+      {canManage &&
+        (editing ? (
+          <form
+            className="household-address-editor"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (await onSave(address)) setEditing(false);
+            }}
+          >
+            <input
+              className="input"
+              required
+              maxLength={300}
+              value={address}
+              aria-label={t("Address for {{name}}", {
+                name: household.name,
+              })}
+              onChange={(event) => setAddress(event.target.value)}
+            />
+            <button className="primary-button" disabled={busy}>
+              {t("Save")}
+            </button>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => {
+                setAddress(household.address);
+                setEditing(false);
+              }}
+            >
+              {t("Cancel")}
+            </button>
+          </form>
+        ) : (
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil size={16} />
+            {household.address ? t("Edit address") : t("Add address")}
+          </button>
+        ))}
+    </div>
   );
 }
 

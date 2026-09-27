@@ -204,8 +204,54 @@ export const hebrew: Record<string, string> = {
   "Group schedule": "לוח הזמנים של הקבוצה",
   "No event scheduled": "אין אירוע מתוכנן",
   "Privacy and consent": "פרטיות והסכמה",
-  "Addresses stay private to authorized rides.":
-    "הכתובות נשארות פרטיות ומוצגות רק לנסיעות מורשות.",
+  "Group members can view household addresses for driving and routes.":
+    "חברי הקבוצה יכולים לראות כתובות משקי בית לצורך נהיגה ומסלולים.",
+  "Change ride status for {{name}}": "שינוי מצב הנסיעה של {{name}}",
+  "Ride status for {{name}}": "מצב הנסיעה של {{name}}",
+  Close: "סגירה",
+  "Not attending this event": "לא משתתף באירוע הזה",
+  "Include this member in the outbound ride":
+    "כללו את החבר בנסיעה לאירוע",
+  "Include this member in the return ride":
+    "כללו את החבר בנסיעה חזרה",
+  Done: "סיום",
+  "Driver: {{name}}": "נהג: {{name}}",
+  "No address added": "לא נוספה כתובת",
+  "Could not build route.": "לא ניתן לבנות את המסלול.",
+  "Reconnect to open a route.": "התחברו מחדש כדי לפתוח מסלול.",
+  "The route needs a start and destination.":
+    "למסלול דרושות נקודת התחלה ויעד.",
+  "Preparing route…": "מכינים מסלול…",
+  "Open route": "פתיחת מסלול",
+  "Change maps app": "החלפת אפליקציית מפות",
+  "Choose your maps app": "בחירת אפליקציית מפות",
+  "Google Maps opens every stop. Apple Maps and Waze guide one stop at a time.":
+    "Google Maps פותחת את כל התחנות. Apple Maps ו-Waze מנחות לתחנה אחת בכל פעם.",
+  "Return here when you are ready for the next stop. Opening a stop does not mark arrival.":
+    "חזרו לכאן כשתהיו מוכנים לתחנה הבאה. פתיחת תחנה אינה מסמנת הגעה.",
+  "Route stops": "תחנות המסלול",
+  "Open next stop: {{name}}": "פתיחת התחנה הבאה: {{name}}",
+  "Final destination opened": "היעד הסופי נפתח",
+  "Starting point": "נקודת התחלה",
+  "Household addresses": "כתובות משקי הבית",
+  "Visible to group members for pickups and driving routes.":
+    "גלוי לחברי הקבוצה לצורך איסופים ומסלולי נסיעה.",
+  "Address for {{name}}": "כתובת עבור {{name}}",
+  "Edit address": "עריכת כתובת",
+  "Add address": "הוספת כתובת",
+  "Invalid route request.": "בקשת המסלול אינה תקינה.",
+  "That ride is not required.": "הנסיעה הזו אינה נדרשת.",
+  "This event is inside a group break.": "האירוע חל במהלך הפסקה קבוצתית.",
+  "A family must claim this ride before routing.":
+    "משפחה צריכה לקחת את הנסיעה לפני יצירת מסלול.",
+  "No members currently need this ride.":
+    "אין כרגע חברים הזקוקים לנסיעה הזו.",
+  "Driving family not found.": "המשפחה המסיעה לא נמצאה.",
+  "Event venue not found.": "מקום האירוע לא נמצא.",
+  "Add missing household and venue addresses before opening this route.":
+    "הוסיפו את כתובות משקי הבית והמקום החסרות לפני פתיחת המסלול.",
+  "One or more route addresses could not be located.":
+    "לא ניתן לאתר כתובת אחת או יותר במסלול.",
   "About and important notice": "אודות והודעה חשובה",
   "What this service does—and does not—provide.":
     "מה השירות מספק ומה אינו מספק.",
