@@ -29,6 +29,10 @@ export function PushReminderSettings() {
   useEffect(() => {
     async function initialize() {
       await Promise.resolve();
+      const appleMobile =
+        /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      setAppleNeedsInstall(appleMobile && !appIsInstalled());
       const canPush =
         "serviceWorker" in navigator &&
         "PushManager" in window &&
@@ -36,10 +40,6 @@ export function PushReminderSettings() {
       setSupported(canPush);
       if (!canPush) return;
       setPermission(Notification.permission);
-      const appleMobile =
-        /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      setAppleNeedsInstall(appleMobile && !appIsInstalled());
       try {
         const registration = await navigator.serviceWorker.ready;
         const current = await registration.pushManager.getSubscription();
@@ -205,7 +205,7 @@ export function PushReminderSettings() {
           "Each adult chooses a reminder time on every device. Reminders are sent only for rides their family is driving.",
         )}
       </p>
-      {supported === false && (
+      {supported === false && !appleNeedsInstall && (
         <p className="notice">
           {t("This browser does not support app notifications.")}
         </p>
