@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import bcrypt from "bcryptjs";
 import {
+  membershipsForPhone,
   matchingRosterEntries,
   type RosterEntry,
 } from "./group-access";
@@ -22,6 +23,40 @@ test("matches a roster entry only when its group PIN is correct", async () => {
     entry,
   ]);
   assert.deepEqual(await matchingRosterEntries([entry], hashes, "0000"), []);
+});
+
+test("links every same-phone roster group after one PIN is verified", () => {
+  const entries: RosterEntry[] = [
+    {
+      id: "entry-a",
+      group_id: "group-a",
+      display_name: "Alex",
+      role: "owner",
+    },
+    {
+      id: "entry-b",
+      group_id: "group-b",
+      display_name: "Alex",
+      role: "member",
+    },
+  ];
+
+  assert.deepEqual(membershipsForPhone(entries, "user-a"), [
+    {
+      group_id: "group-a",
+      user_id: "user-a",
+      roster_entry_id: "entry-a",
+      role: "owner",
+      status: "active",
+    },
+    {
+      group_id: "group-b",
+      user_id: "user-a",
+      roster_entry_id: "entry-b",
+      role: "member",
+      status: "active",
+    },
+  ]);
 });
 
 test("returns every match so ambiguous group PINs can be rejected", async () => {

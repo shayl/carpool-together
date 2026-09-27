@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   matchingRosterEntries,
+  membershipsForPhone,
   type RosterEntry,
 } from "@/lib/group-access";
 import {
@@ -16,7 +17,6 @@ const loginSchema = z.object({
   phone: z.string().min(7).max(30),
   pin: z.string().min(4).max(12),
   accessToken: z.string().min(20),
-  targetGroupId: z.string().uuid().optional(),
 });
 
 async function handleLogin(request: Request) {
@@ -37,7 +37,7 @@ async function handleLogin(request: Request) {
     );
   }
 
-  const { accessToken, phone, pin, targetGroupId } = parsed.data;
+  const { accessToken, phone, pin } = parsed.data;
   const admin = createAdminClient();
   const { data: authData, error: authError } =
     await admin.auth.getUser(accessToken);
@@ -82,10 +82,7 @@ async function handleLogin(request: Request) {
       group.pin_hash as string | null,
     ]),
   );
-  const loginEntries = targetGroupId
-    ? entries.filter((entry) => entry.group_id === targetGroupId)
-    : entries;
-  const matches = await matchingRosterEntries(loginEntries, pinHashes, pin);
+  const matches = await matchingRosterEntries(entries, pinHashes, pin);
 
   if (matches.length === 0) {
     await recordFailedLogin(admin, rateLimitHash);
@@ -109,13 +106,7 @@ async function handleLogin(request: Request) {
   const { error: membershipError } = await admin
     .from("group_memberships")
     .upsert(
-      {
-        group_id: match.group_id,
-        user_id: authData.user.id,
-        roster_entry_id: match.id,
-        role: match.role,
-        status: "active",
-      },
+      membershipsForPhone(entries, authData.user.id),
       { onConflict: "group_id,user_id" },
     );
 
@@ -140,27 +131,11 @@ async function handleLogin(request: Request) {
     );
   }
 
-  const { data: verifiedMemberships, error: verifiedMembershipsError } =
-    await admin
-      .from("group_memberships")
-      .select("group_id")
-      .eq("user_id", authData.user.id)
-      .eq("status", "active")
-      .in("group_id", groupIds);
-  if (verifiedMembershipsError) throw verifiedMembershipsError;
-
-  const verifiedGroupIds = new Set(
-    (verifiedMemberships ?? []).map((membership) => membership.group_id),
-  );
-  const unverifiedGroups = (groups ?? [])
-    .filter((group) => !verifiedGroupIds.has(group.id))
-    .map((group) => ({ id: group.id, name: group.name }));
-
   await clearFailedLogins(admin, rateLimitHash);
   return Response.json({
     ok: true,
     groupId: match.group_id,
-    unverifiedGroups,
+    linkedGroupCount: entries.length,
   });
 }
 

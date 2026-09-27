@@ -23,3 +23,13 @@ export async function matchingRosterEntries(
 
   return matches;
 }
+
+export function membershipsForPhone(entries: RosterEntry[], userId: string) {
+  return entries.map((entry) => ({
+    group_id: entry.group_id,
+    user_id: userId,
+    roster_entry_id: entry.id,
+    role: entry.role,
+    status: "active" as const,
+  }));
+}
