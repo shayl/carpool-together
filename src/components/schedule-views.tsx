@@ -38,6 +38,11 @@ import {
   requiredLegs,
   rideState,
 } from "@/lib/schedule-state";
+import { MemberAvatar } from "@/components/member-avatar";
+import {
+  coverageMood,
+  RideStatusCar,
+} from "@/components/ride-status-car";
 import type {
   EventType,
   GroupEvent,
@@ -400,7 +405,7 @@ function MonthGrid({
                 {dayEvents.map((event) => (
                   <button
                     key={event.id}
-                    className={`month-event month-event-${eventCoverage(schedule, event)}`}
+                    className={`month-event month-event-${coverageMood(eventCoverage(schedule, event))}`}
                     type="button"
                     onClick={() => onOpen(event.id)}
                   >
@@ -435,9 +440,13 @@ function EventCard({
     (item) => item.id === event.locationId,
   );
   const coverage = eventCoverage(schedule, event);
+  const openRides = requiredLegs(event).filter(
+    (leg) => rideState(schedule, event, leg).open,
+  ).length;
+  const mood = coverageMood(coverage);
 
   return (
-    <article className={`weekly-event weekly-event-${coverage}`}>
+    <article className={`weekly-event weekly-event-${mood}`}>
       <button
         type="button"
         className="weekly-event-summary"
@@ -456,12 +465,12 @@ function EventCard({
           </span>
         </span>
         <span className="weekly-event-coverage">
-          <Car className={`ride-status-car ride-status-car-${coverage}`} />
+          <RideStatusCar status={coverage} />
           <span>
             {coverage === "covered"
-              ? t("Covered")
+              ? t("All rides have drivers")
               : coverage === "open"
-                ? t("Needs a driver")
+                ? t("{{count}} rides need a driver", { count: openRides })
                 : t("No carpool needed")}
           </span>
         </span>
@@ -472,6 +481,31 @@ function EventCard({
       </button>
       {expanded && (
         <div className="weekly-event-details">
+          <div className="member-avatar-row" aria-label={t("Member ride status")}>
+            {schedule.participants.map((participant) => {
+              const attendance = effectiveAttendance(
+                schedule,
+                event,
+                participant,
+              );
+              return (
+                <span
+                  className={
+                    attendance.absent ? "member-avatar-item is-inactive" : "member-avatar-item"
+                  }
+                  key={participant.id}
+                  title={participant.name}
+                >
+                  <MemberAvatar
+                    name={participant.name}
+                    photoUrl={participant.photoUrl}
+                    size={40}
+                  />
+                  <span>{participant.name.split(/\s+/)[0]}</span>
+                </span>
+              );
+            })}
+          </div>
           {requiredLegs(event).map((leg) => (
             <RideLegPanel
               key={leg}
@@ -609,7 +643,14 @@ function AttendancePanel({
           );
         return (
           <div className="attendance-row" key={participant.id}>
-            <strong>{participant.name}</strong>
+            <span className="attendance-member">
+              <MemberAvatar
+                name={participant.name}
+                photoUrl={participant.photoUrl}
+                size={32}
+              />
+              <strong>{participant.name}</strong>
+            </span>
             <label>
               <input
                 type="checkbox"

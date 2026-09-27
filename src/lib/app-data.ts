@@ -7,6 +7,7 @@ export type AppRosterEntry = {
   id: string;
   displayName: string;
   phone?: string;
+  photoUrl?: string;
   role: GroupRole;
   active: boolean;
 };
@@ -16,8 +17,10 @@ export type AppGroup = {
   name: string;
   shortName: string;
   accent: string;
+  iconUrl?: string;
   role: GroupRole;
   canManageRoster: boolean;
+  currentRosterEntryId: string | null;
   roster: AppRosterEntry[];
   schedule: GroupSchedule;
 };
@@ -38,7 +41,7 @@ export async function loadAppData(userId: string) {
   const admin = createAdminClient();
   const { data: memberships, error: membershipsError } = await admin
     .from("group_memberships")
-    .select("group_id, role")
+    .select("group_id, role, roster_entry_id")
     .eq("user_id", userId)
     .eq("status", "active");
 
@@ -53,11 +56,11 @@ export async function loadAppData(userId: string) {
   ] = await Promise.all([
       admin
         .from("groups")
-        .select("id, name, accent_color")
+        .select("id, name, accent_color, icon_path")
         .in("id", groupIds),
       admin
         .from("group_access_roster")
-        .select("id, group_id, display_name, phone, role, active")
+        .select("id, group_id, display_name, phone, photo_path, role, active")
         .in("group_id", groupIds)
         .order("display_name"),
       loadGroupSchedules(groupIds, userId),
@@ -80,8 +83,12 @@ export async function loadAppData(userId: string) {
         name: group.name,
         shortName: initials(group.name),
         accent: group.accent_color,
+        ...(group.icon_path
+          ? { iconUrl: `/api/groups/${group.id}/icon` }
+          : {}),
         role,
         canManageRoster,
+        currentRosterEntryId: membership.roster_entry_id,
         schedule: schedules.get(group.id) ?? {
           households: [],
           participants: [],
@@ -100,6 +107,11 @@ export async function loadAppData(userId: string) {
             id: entry.id,
             displayName: entry.display_name,
             ...(canManageRoster ? { phone: entry.phone } : {}),
+            ...(entry.photo_path
+              ? {
+                  photoUrl: `/api/groups/${group.id}/roster/${entry.id}/photo`,
+                }
+              : {}),
             role: entry.role as GroupRole,
             active: entry.active,
           })),

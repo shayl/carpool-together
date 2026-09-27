@@ -158,6 +158,30 @@ button:disabled {
   font-weight: 850;
 }
 
+.member-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--team) 13%, white);
+  background-position: center;
+  background-size: cover;
+  color: var(--team);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.member-avatar-photo {
+  box-shadow: inset 0 0 0 2px white;
+}
+
+.team-logo.member-avatar {
+  border-radius: 9px;
+  background-color: var(--team);
+  color: white;
+}
+
 .brand-copy {
   min-width: 0;
 }
@@ -571,6 +595,18 @@ button:disabled {
   transform: translateY(2px) rotate(-1.5deg);
 }
 
+.ride-status-car-neutral {
+  opacity: 0.72;
+}
+
+.weekly-event-happy .weekly-event-coverage > span {
+  color: #235842;
+}
+
+.weekly-event-sad .weekly-event-coverage > span {
+  color: #805511;
+}
+
 .weekly-event-chevron {
   color: var(--muted);
   transform: rotate(180deg);
@@ -638,16 +674,8 @@ button:disabled {
 }
 
 .person-avatar {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--team) 13%, white);
-  color: var(--team);
-  font-size: 12px;
-  font-weight: 800;
+  width: 44px;
+  height: 44px;
 }
 
 .person-avatar-large {
@@ -781,6 +809,36 @@ button:disabled {
   font-size: 13px;
 }
 
+.member-avatar-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 8px 0 14px;
+}
+
+.member-avatar-item {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 4px;
+  max-width: 64px;
+  color: var(--foreground);
+  font-size: 12px;
+}
+
+.member-avatar-item > span:last-child {
+  width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-avatar-item.is-inactive {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
 .attendance-row {
   display: grid;
   grid-template-columns: minmax(100px, 1fr) repeat(3, auto);
@@ -788,6 +846,13 @@ button:disabled {
   gap: 12px;
   border-top: 1px solid var(--border);
   padding-top: 10px;
+}
+
+.attendance-member {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .attendance-row label,
@@ -869,12 +934,54 @@ button:disabled {
   text-align: start;
 }
 
-.month-event-open {
+.month-event-sad {
   background: #fff0ed;
 }
 
-.month-event-covered {
+.month-event-happy {
   background: #edf6f1;
+}
+
+.month-event-neutral {
+  background: #f1efff;
+}
+
+.image-actions {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px !important;
+}
+
+.image-upload-button {
+  cursor: pointer;
+}
+
+.image-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.group-appearance-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.group-appearance-card h3,
+.group-appearance-card p {
+  margin: 0;
+}
+
+.group-appearance-card .image-actions {
+  margin-top: 12px !important;
+}
+
+.group-icon-preview {
+  border-radius: 16px;
 }
 
 .schedule-form {

@@ -17,6 +17,7 @@ export type GroupParticipant = {
   householdId: string;
   rosterEntryId: string | null;
   name: string;
+  photoUrl?: string;
 };
 
 export type GroupLocation = {

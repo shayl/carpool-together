@@ -6,6 +6,7 @@ import {
   Car,
   ChevronDown,
   Heart,
+  ImagePlus,
   Info,
   LogOut,
   Settings,
@@ -18,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { AppVersion } from "@/components/app-version";
 import { GeneratedGroupPin } from "@/components/generated-group-pin";
 import { GroupPinSettings } from "@/components/group-pin-settings";
+import { MemberAvatar } from "@/components/member-avatar";
 import { ScheduleViews } from "@/components/schedule-views";
 import type { AppGroup } from "@/lib/app-data";
 import { useI18n } from "@/lib/i18n";
@@ -32,16 +34,6 @@ const destinations = [
   { id: "team", label: "Team", icon: Users },
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
 
 export function CarpoolApp({
   initialGroups,
@@ -64,6 +56,8 @@ export function CarpoolApp({
   >("member");
   const [csv, setCsv] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
+  const [existingGroupPhone, setExistingGroupPhone] = useState("");
+  const [existingGroupPin, setExistingGroupPin] = useState("");
   const [createdGroup, setCreatedGroup] = useState<{
     name: string;
     pin: string;
@@ -72,6 +66,7 @@ export function CarpoolApp({
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState("");
   const [signingOut, setSigningOut] = useState(false);
 
   const group = useMemo(
@@ -194,6 +189,7 @@ export function CarpoolApp({
           result.error ? t(result.error) : t("Could not create the group."),
         );
       }
+
       if (!result.pin) {
         throw new Error(t("Could not generate a group PIN."));
       }
@@ -206,6 +202,47 @@ export function CarpoolApp({
         caught instanceof Error
           ? caught.message
           : t("Could not create the group."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addExistingGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const { data, error: sessionError } =
+        await createClient().auth.getSession();
+      if (sessionError) throw sessionError;
+      const accessToken = data.session?.access_token;
+      if (!accessToken) throw new Error(t("Sign-in required."));
+
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: existingGroupPhone,
+          pin: existingGroupPin,
+          accessToken,
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(result?.error ?? t("Could not add the group."));
+      }
+
+      setExistingGroupPhone("");
+      setExistingGroupPin("");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? t(caught.message)
+          : t("Could not add the group."),
       );
     } finally {
       setLoading(false);
@@ -252,6 +289,61 @@ export function CarpoolApp({
     router.refresh();
   }
 
+  async function changeImage(
+    endpoint: string,
+    image: File,
+    key: string,
+  ) {
+    setUploadingImage(key);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.set("image", image);
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        body: formData,
+      });
+      const result = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(result?.error ?? t("Could not save the image."));
+      }
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? t(caught.message)
+          : t("Could not save the image."),
+      );
+    } finally {
+      setUploadingImage("");
+    }
+  }
+
+  async function removeImage(endpoint: string, key: string) {
+    setUploadingImage(key);
+    setError("");
+    try {
+      const response = await fetch(endpoint, { method: "DELETE" });
+      const result = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(result?.error ?? t("Could not remove the image."));
+      }
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? t(caught.message)
+          : t("Could not remove the image."),
+      );
+    } finally {
+      setUploadingImage("");
+    }
+  }
+
   return (
     <div
       className="app-shell"
@@ -263,9 +355,12 @@ export function CarpoolApp({
       <header className="app-header">
         <div className="app-header-inner">
           <div className="brand-lockup">
-            <div className="team-logo" aria-hidden="true">
-              {group.shortName}
-            </div>
+            <MemberAvatar
+              name={group.shortName}
+              photoUrl={group.iconUrl}
+              size={44}
+              className="team-logo"
+            />
             <div className="brand-copy">
               <p>{t("{{group}} Carpool", { group: group.name })}</p>
               <span>{memberName}</span>
@@ -345,12 +440,59 @@ export function CarpoolApp({
               </div>
               {group.roster.map((member) => (
                 <div className="person-row" key={member.id}>
-                  <div className="person-avatar">
-                    {initials(member.displayName)}
-                  </div>
+                  <MemberAvatar
+                    name={member.displayName}
+                    photoUrl={member.photoUrl}
+                    size={44}
+                    className="person-avatar"
+                  />
                   <div>
                     <strong>{member.displayName}</strong>
                     <span>{member.phone ?? t("Phone hidden")}</span>
+                    {(group.canManageRoster ||
+                      group.currentRosterEntryId === member.id) && (
+                      <span className="image-actions">
+                        <label className="text-button image-upload-button">
+                          <ImagePlus size={15} aria-hidden="true" />
+                          {uploadingImage === `member-${member.id}`
+                            ? t("Uploading…")
+                            : member.photoUrl
+                              ? t("Change photo")
+                              : t("Add photo")}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            disabled={Boolean(uploadingImage)}
+                            onChange={(event) => {
+                              const image = event.target.files?.[0];
+                              event.target.value = "";
+                              if (image) {
+                                void changeImage(
+                                  `/api/groups/${group.id}/roster/${member.id}/photo`,
+                                  image,
+                                  `member-${member.id}`,
+                                );
+                              }
+                            }}
+                          />
+                        </label>
+                        {member.photoUrl && (
+                          <button
+                            className="text-button"
+                            type="button"
+                            disabled={Boolean(uploadingImage)}
+                            onClick={() =>
+                              void removeImage(
+                                `/api/groups/${group.id}/roster/${member.id}/photo`,
+                                `member-${member.id}`,
+                              )
+                            }
+                          >
+                            {t("Remove photo")}
+                          </button>
+                        )}
+                      </span>
+                    )}
                   </div>
                   <small>{t(member.role)}</small>
                 </div>
@@ -499,6 +641,11 @@ export function CarpoolApp({
             onAbout={() => setSettingsPage("about")}
             onCreateGroup={createGroup}
             onGroupName={setNewGroupName}
+            existingGroupPhone={existingGroupPhone}
+            existingGroupPin={existingGroupPin}
+            onExistingGroupPhone={setExistingGroupPhone}
+            onExistingGroupPin={setExistingGroupPin}
+            onAddExistingGroup={addExistingGroup}
             onCreatedGroupDone={() => setCreatedGroup(null)}
             onShowDelete={() => {
               setShowDeleteGroup(true);
@@ -511,6 +658,9 @@ export function CarpoolApp({
               setError("");
             }}
             onDelete={deleteGroup}
+            uploadingImage={uploadingImage}
+            onChangeImage={changeImage}
+            onRemoveImage={removeImage}
           />
         )}
         <footer>
@@ -591,7 +741,12 @@ function GroupSettings({
               aria-current={current ? "true" : undefined}
               onClick={() => onGroup(item.id)}
             >
-              <span className="settings-group-logo">{item.shortName}</span>
+              <MemberAvatar
+                name={item.shortName}
+                photoUrl={item.iconUrl}
+                size={42}
+                className="settings-group-logo"
+              />
               <span>
                 <strong>{item.name}</strong>
                 <small>
@@ -622,11 +777,19 @@ type SettingsHomeProps = {
   onAbout: () => void;
   onCreateGroup: (event: FormEvent<HTMLFormElement>) => void;
   onGroupName: (value: string) => void;
+  existingGroupPhone: string;
+  existingGroupPin: string;
+  onExistingGroupPhone: (value: string) => void;
+  onExistingGroupPin: (value: string) => void;
+  onAddExistingGroup: (event: FormEvent<HTMLFormElement>) => void;
   onCreatedGroupDone: () => void;
   onShowDelete: () => void;
   onDeleteConfirmation: (value: string) => void;
   onCancelDelete: () => void;
   onDelete: () => void;
+  uploadingImage: string;
+  onChangeImage: (endpoint: string, image: File, key: string) => Promise<void>;
+  onRemoveImage: (endpoint: string, key: string) => Promise<void>;
 };
 
 function SettingsHome(props: SettingsHomeProps) {
@@ -637,6 +800,66 @@ function SettingsHome(props: SettingsHomeProps) {
         <h1>{t("Settings")}</h1>
         <p>{props.group.name}</p>
       </div>
+      {props.group.canManageRoster && (
+        <>
+          <h2 className="settings-section-title">{t("Group appearance")}</h2>
+          <section className="surface-card group-appearance-card">
+            <MemberAvatar
+              name={props.group.shortName}
+              photoUrl={props.group.iconUrl}
+              size={72}
+              className="group-icon-preview"
+            />
+            <div>
+              <h3>{t("Group icon")}</h3>
+              <p className="text-muted">
+                {t("Shown in the app header and group switcher.")}
+              </p>
+              <span className="image-actions">
+                <label className="secondary-button image-upload-button">
+                  <ImagePlus size={17} aria-hidden="true" />
+                  {props.uploadingImage === "group-icon"
+                    ? t("Uploading…")
+                    : props.group.iconUrl
+                      ? t("Change icon")
+                      : t("Add icon")}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={Boolean(props.uploadingImage)}
+                    onChange={(event) => {
+                      const image = event.target.files?.[0];
+                      event.target.value = "";
+                      if (image) {
+                        void props.onChangeImage(
+                          `/api/groups/${props.group.id}/icon`,
+                          image,
+                          "group-icon",
+                        );
+                      }
+                    }}
+                  />
+                </label>
+                {props.group.iconUrl && (
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={Boolean(props.uploadingImage)}
+                    onClick={() =>
+                      void props.onRemoveImage(
+                        `/api/groups/${props.group.id}/icon`,
+                        "group-icon",
+                      )
+                    }
+                  >
+                    {t("Remove icon")}
+                  </button>
+                )}
+              </span>
+            </div>
+          </section>
+        </>
+      )}
       <h2 className="settings-section-title">{t("Active group")}</h2>
       <section className="settings-link-card">
         <button type="button" onClick={props.onGroups}>
@@ -675,6 +898,49 @@ function SettingsHome(props: SettingsHomeProps) {
           </span>
           <span aria-hidden="true">›</span>
         </button>
+      </section>
+
+      <h2 className="settings-section-title">{t("Add an existing group")}</h2>
+      <section className="surface-card">
+        <form className="auth-form" onSubmit={props.onAddExistingGroup}>
+          <p className="text-muted">
+            {t(
+              "Verify another group with its phone number and PIN. Your verified groups will appear in the selector.",
+            )}
+          </p>
+          <label htmlFor="existing-group-phone">{t("Phone number")}</label>
+          <div className="auth-input-wrap">
+            <input
+              id="existing-group-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              required
+              maxLength={30}
+              value={props.existingGroupPhone}
+              onChange={(event) =>
+                props.onExistingGroupPhone(event.target.value)
+              }
+            />
+          </div>
+          <label htmlFor="existing-group-pin">{t("Group PIN")}</label>
+          <div className="auth-input-wrap">
+            <input
+              id="existing-group-pin"
+              type="password"
+              inputMode="numeric"
+              autoComplete="current-password"
+              required
+              minLength={4}
+              maxLength={12}
+              value={props.existingGroupPin}
+              onChange={(event) => props.onExistingGroupPin(event.target.value)}
+            />
+          </div>
+          <button className="primary-button" disabled={props.loading}>
+            {props.loading ? t("Adding…") : t("Add group")}
+          </button>
+        </form>
       </section>
 
       <h2 className="settings-section-title">{t("Create another group")}</h2>

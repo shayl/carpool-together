@@ -93,7 +93,7 @@ export async function loadGroupSchedules(
       .in("group_id", authorizedGroupIds),
     admin
       .from("group_access_roster")
-      .select("id, group_id, household_id")
+      .select("id, group_id, household_id, photo_path")
       .in("group_id", authorizedGroupIds),
   ]);
 
@@ -143,13 +143,25 @@ export async function loadGroupSchedules(
         participantsResult.data,
         membership.group_id,
       ).map(
-        (row): GroupParticipant => ({
-          id: row.id,
-          groupId: row.group_id,
-          householdId: row.household_id,
-          rosterEntryId: row.roster_entry_id,
-          name: row.display_name,
-        }),
+        (row): GroupParticipant => {
+          const rosterEntry = (rosterResult.data ?? []).find(
+            (entry) =>
+              entry.group_id === membership.group_id &&
+              entry.id === row.roster_entry_id,
+          );
+          return {
+            id: row.id,
+            groupId: row.group_id,
+            householdId: row.household_id,
+            rosterEntryId: row.roster_entry_id,
+            name: row.display_name,
+            ...(rosterEntry?.photo_path
+              ? {
+                  photoUrl: `/api/groups/${membership.group_id}/roster/${rosterEntry.id}/photo`,
+                }
+              : {}),
+          };
+        },
       ),
       locations: byGroup(locationsResult.data, membership.group_id).map(
         (row): GroupLocation => ({
