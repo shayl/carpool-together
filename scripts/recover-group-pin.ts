@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { decryptGroupPin } from "../src/lib/group-pin";
+import { nearestGroupSuggestions } from "../src/lib/group-name-suggestions";
 
 type GroupRecord = {
   id: string;
@@ -58,10 +59,27 @@ async function findGroups() {
   return nameResult.data as GroupRecord[];
 }
 
+async function suggestGroups() {
+  const result = await admin
+    .from("groups")
+    .select("id, name, slug")
+    .order("name")
+    .limit(1000);
+  if (result.error) throw result.error;
+  return nearestGroupSuggestions(identifier, result.data);
+}
+
 async function main() {
   const groups = await findGroups();
   if (groups.length === 0) {
     console.error(`No group matched "${identifier}".`);
+    const suggestions = await suggestGroups();
+    if (suggestions.length) {
+      console.error("Did you mean one of these? Retry with its ID or slug:");
+      for (const group of suggestions) {
+        console.error(`- ${group.name}  [${group.slug}]  ${group.id}`);
+      }
+    }
     process.exit(1);
   }
   if (groups.length > 1) {
