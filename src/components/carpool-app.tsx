@@ -17,6 +17,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppVersion } from "@/components/app-version";
 import { GeneratedGroupPin } from "@/components/generated-group-pin";
+import { GroupPinSettings } from "@/components/group-pin-settings";
 import { ScheduleViews } from "@/components/schedule-views";
 import type { AppGroup } from "@/lib/app-data";
 import { useI18n } from "@/lib/i18n";
@@ -706,6 +707,13 @@ function SettingsHome(props: SettingsHomeProps) {
           </form>
         )}
       </section>
+
+      {props.group.role === "owner" && (
+        <>
+          <h2 className="settings-section-title">{t("Access")}</h2>
+          <GroupPinSettings groupId={props.group.id} />
+        </>
+      )}
 
       {props.group.role === "owner" && (
         <>

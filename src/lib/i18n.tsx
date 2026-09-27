@@ -136,6 +136,18 @@ const hebrew: Record<string, string> = {
   "Could not generate a group PIN.": "לא ניתן ליצור קוד לקבוצה.",
   "Could not generate a unique group PIN. Try again.":
     "לא ניתן ליצור קוד ייחודי לקבוצה. נסו שוב.",
+  Access: "גישה",
+  "Only group owners can reveal or regenerate this PIN.":
+    "רק בעלי הקבוצה יכולים להציג או ליצור מחדש את הקוד.",
+  "Could not load the group PIN.": "לא ניתן לטעון את קוד הקבוצה.",
+  "Regenerate the PIN once to make it viewable.":
+    "צרו את הקוד מחדש פעם אחת כדי שיהיה ניתן להצגה.",
+  "Reveal PIN": "הצגת הקוד",
+  "Generate a new PIN": "יצירת קוד חדש",
+  "Generating…": "יוצרים…",
+  "Invalidate old PIN and generate": "ביטול הקוד הישן ויצירת חדש",
+  "The old PIN will stop working immediately.":
+    "הקוד הישן יפסיק לעבוד מיד.",
   "4 to 12 characters": "4 עד 12 תווים",
   "Creating…": "יוצרים…",
   "Create group": "יצירת קבוצה",

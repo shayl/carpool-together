@@ -56,11 +56,12 @@ async function registerGroup(request: Request) {
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const pin = await prepareGeneratedGroupPin(legacyPinHashes);
-    const result = await admin.rpc("register_group_with_generated_pin", {
+    const result = await admin.rpc("register_group_with_recoverable_pin", {
       auth_user_id: authData.user.id,
       group_name: parsed.data.groupName,
       group_pin_fingerprint: pin.pinFingerprint,
       group_pin_hash: pin.pinHash,
+      group_pin_ciphertext: pin.pinCiphertext,
       group_slug: slug,
       member_name: parsed.data.memberName,
       member_phone: normalizePhone(parsed.data.phone),

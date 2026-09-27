@@ -63,12 +63,13 @@ async function createGroup(request: Request) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const pin = await prepareGeneratedGroupPin(legacyPinHashes);
     const result = await admin.rpc(
-      "create_additional_group_with_generated_pin",
+      "create_additional_group_with_recoverable_pin",
       {
         auth_user_id: userId,
         group_name: input.data.name,
         group_pin_fingerprint: pin.pinFingerprint,
         group_pin_hash: pin.pinHash,
+        group_pin_ciphertext: pin.pinCiphertext,
         group_slug: slug,
         member_name: rosterEntry.display_name,
         member_phone: normalizePhone(rosterEntry.phone),

@@ -1319,6 +1319,25 @@ button:disabled {
   justify-content: center;
 }
 
+.group-pin-settings {
+  display: grid;
+  gap: 14px;
+}
+
+.group-pin-settings h3,
+.group-pin-settings p {
+  margin: 0;
+}
+
+.group-pin-settings .generated-pin {
+  max-width: 360px;
+}
+
+.group-pin-settings .secondary-button,
+.group-pin-settings .text-button {
+  width: fit-content;
+}
+
 .about-version {
   display: block;
   margin-top: 18px;
