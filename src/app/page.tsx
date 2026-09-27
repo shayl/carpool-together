@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { CarpoolApp } from "@/components/carpool-app";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { SetupForm } from "@/components/auth/setup-form";
+import { loadAppData } from "@/lib/app-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -35,23 +36,12 @@ export default async function Home() {
     return <SignInForm />;
   }
 
-  const { data: membership, error: membershipError } = await supabase
-    .from("group_memberships")
-    .select("group_id")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-
-  if (membershipError) {
-    throw membershipError;
-  }
-
-  if (!membership) {
+  const groups = await loadAppData(userId);
+  if (groups.length === 0) {
     return <SignInForm />;
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
     .select("display_name")
     .eq("user_id", userId)
@@ -61,5 +51,7 @@ export default async function Home() {
     throw profileError;
   }
 
-  return <CarpoolApp memberName={profile.display_name} />;
+  return (
+    <CarpoolApp initialGroups={groups} memberName={profile.display_name} />
+  );
 }

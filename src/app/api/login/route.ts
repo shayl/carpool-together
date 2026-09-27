@@ -3,7 +3,13 @@ import {
   matchingRosterEntries,
   type RosterEntry,
 } from "@/lib/group-access";
+import {
+  clearFailedLogins,
+  enforceLoginRateLimit,
+  recordFailedLogin,
+} from "@/lib/login-rate-limit";
 import { phoneLookupValues } from "@/lib/phone";
+import { apiError } from "@/lib/server-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const loginSchema = z.object({
@@ -12,7 +18,7 @@ const loginSchema = z.object({
   accessToken: z.string().min(20),
 });
 
-export async function POST(request: Request) {
+async function handleLogin(request: Request) {
   let input: unknown;
 
   try {
@@ -39,9 +45,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid device session." }, { status: 401 });
   }
 
+  const rateLimitHash = await enforceLoginRateLimit(admin, phone, request);
   const { data: rosterEntries, error: rosterError } = await admin
     .from("group_access_roster")
-    .select("group_id, display_name, role")
+    .select("id, group_id, display_name, role")
     .in("phone", phoneLookupValues(phone))
     .eq("active", true)
     .limit(20);
@@ -77,6 +84,7 @@ export async function POST(request: Request) {
   const matches = await matchingRosterEntries(entries, pinHashes, pin);
 
   if (matches.length === 0) {
+    await recordFailedLogin(admin, rateLimitHash);
     return Response.json(
       { error: "Phone number or group PIN is incorrect." },
       { status: 401 },
@@ -100,6 +108,7 @@ export async function POST(request: Request) {
       {
         group_id: match.group_id,
         user_id: authData.user.id,
+        roster_entry_id: match.id,
         role: match.role,
         status: "active",
       },
@@ -127,5 +136,14 @@ export async function POST(request: Request) {
     );
   }
 
+  await clearFailedLogins(admin, rateLimitHash);
   return Response.json({ ok: true });
+}
+
+export async function POST(request: Request) {
+  try {
+    return await handleLogin(request);
+  } catch (error) {
+    return apiError(error);
+  }
 }

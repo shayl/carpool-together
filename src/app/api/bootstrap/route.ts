@@ -26,7 +26,9 @@ function secretsMatch(actual: string, expected: string) {
 
 export async function POST(request: Request) {
   try {
-    const parsed = bootstrapSchema.safeParse(await request.json());
+    const parsed = bootstrapSchema.safeParse(
+      await request.json().catch(() => null),
+    );
 
     if (!parsed.success) {
       return Response.json(

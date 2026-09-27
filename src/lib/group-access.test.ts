@@ -8,6 +8,7 @@ import {
 
 test("matches a roster entry only when its group PIN is correct", async () => {
   const entry: RosterEntry = {
+    id: "entry-a",
     group_id: "group-a",
     display_name: "Alex",
     role: "member",
@@ -25,8 +26,18 @@ test("matches a roster entry only when its group PIN is correct", async () => {
 
 test("returns every match so ambiguous group PINs can be rejected", async () => {
   const entries: RosterEntry[] = [
-    { group_id: "group-a", display_name: "Alex", role: "member" },
-    { group_id: "group-b", display_name: "Alex", role: "coordinator" },
+    {
+      id: "entry-a",
+      group_id: "group-a",
+      display_name: "Alex",
+      role: "member",
+    },
+    {
+      id: "entry-b",
+      group_id: "group-b",
+      display_name: "Alex",
+      role: "coordinator",
+    },
   ];
   const sharedHash = await bcrypt.hash("2468", 4);
 

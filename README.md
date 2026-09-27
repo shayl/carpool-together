@@ -9,17 +9,18 @@ Carpool database or reuse that application's credentials.
 
 ## Current functionality
 
-- Switch between private groups without mixing roster or plan state.
-- Keep group-specific identity, theme, participants, drivers, and seat capacity.
-- Import selected participants from pasted CSV data.
+- Create and switch between private database-backed groups.
+- Protect each group with a private phone roster and hashed shared PIN.
+- Let owners import roster members from pasted name/phone data.
 - Send validated requests to a server-side suggestion endpoint.
 - Produce deterministic, capacity-aware trips and explain uncovered riders.
 - Define tenant-scoped database tables and Row Level Security.
 - Authenticate rostered members with a phone number and shared group PIN.
 - Explain service limitations on the About page.
 
-The interface currently uses fictional in-memory group and ride data. The
-isolated Supabase schema and authentication layer are provisioned.
+The isolated Supabase schema, authentication layer, groups, and access rosters
+are provisioned. Event and ride-planning records are the next persistence
+surface.
 
 ## Run locally
 
@@ -58,10 +59,10 @@ npm run build
 
 - Coordinates and meeting points are fictional.
 - Straight-line distance stands in for a road-time matrix provider.
-- Imported data is held only in React state and resets on refresh.
-- Invitations, consent capture, persistence, route ordering, and driver
-  acceptance are represented in the schema but are not wired into the
-  application yet.
+- Events, rider locations, driver offers, ride requests, and generated plans
+  are represented in the schema but are not yet wired into the interface.
+- Invitations, consent capture, route ordering, and driver acceptance are not
+  yet complete.
 - The shared-PIN flow requires roster provisioning and production-grade
   brute-force protection before opening the app to untrusted traffic.
 - Suggestions are drafts, not ride commitments.

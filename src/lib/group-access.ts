@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 
 export type RosterEntry = {
+  id: string;
   group_id: string;
   display_name: string;
   role: "owner" | "admin" | "coordinator" | "member";

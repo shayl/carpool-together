@@ -13,26 +13,11 @@ import {
   Upload,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type {
-  Coordinate,
-  DriverOffer,
-  Participant,
-  SuggestionPlan,
-} from "@/lib/carpool";
+import type { AppGroup } from "@/lib/app-data";
+import type { SuggestionPlan } from "@/lib/carpool";
 import { createClient } from "@/lib/supabase/browser";
-
-type Group = {
-  id: string;
-  name: string;
-  shortName: string;
-  accent: string;
-  event: string;
-  destination: Coordinate;
-  participants: Participant[];
-  drivers: DriverOffer[];
-};
 
 type Destination = "rides" | "family" | "team" | "settings";
 
@@ -43,105 +28,6 @@ const destinations = [
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
 
-const initialGroups: Group[] = [
-  {
-    id: "rainier-swim",
-    name: "Rainier Swim Club",
-    shortName: "RS",
-    accent: "#5b4bdb",
-    event: "Thursday practice at Medgar Evers Pool",
-    destination: { lat: 47.612, lng: -122.304 },
-    participants: [
-      {
-        id: "maya",
-        groupId: "rainier-swim",
-        name: "Maya Chen",
-        address: "Greenwood meeting point",
-        location: { lat: 47.69, lng: -122.355 },
-        needsRide: true,
-      },
-      {
-        id: "owen",
-        groupId: "rainier-swim",
-        name: "Owen Brooks",
-        address: "Wallingford meeting point",
-        location: { lat: 47.662, lng: -122.335 },
-        needsRide: true,
-      },
-      {
-        id: "lina",
-        groupId: "rainier-swim",
-        name: "Lina Patel",
-        address: "Capitol Hill meeting point",
-        location: { lat: 47.625, lng: -122.316 },
-        needsRide: true,
-      },
-      {
-        id: "theo",
-        groupId: "rainier-swim",
-        name: "Theo James",
-        address: "Beacon Hill meeting point",
-        location: { lat: 47.579, lng: -122.311 },
-        needsRide: false,
-      },
-    ],
-    drivers: [
-      {
-        id: "driver-alex",
-        groupId: "rainier-swim",
-        name: "Alex Morgan",
-        address: "Greenwood",
-        origin: { lat: 47.694, lng: -122.357 },
-        seats: 2,
-      },
-      {
-        id: "driver-sam",
-        groupId: "rainier-swim",
-        name: "Sam Rivera",
-        address: "Beacon Hill",
-        origin: { lat: 47.581, lng: -122.309 },
-        seats: 1,
-      },
-    ],
-  },
-  {
-    id: "wed-dancers",
-    name: "Wednesday Dancers",
-    shortName: "WD",
-    accent: "#466f96",
-    event: "Wednesday rehearsal at Fremont Studios",
-    destination: { lat: 47.651, lng: -122.351 },
-    participants: [
-      {
-        id: "nia",
-        groupId: "wed-dancers",
-        name: "Nia Williams",
-        address: "Magnolia meeting point",
-        location: { lat: 47.653, lng: -122.4 },
-        needsRide: true,
-      },
-      {
-        id: "ava",
-        groupId: "wed-dancers",
-        name: "Ava Kim",
-        address: "Queen Anne meeting point",
-        location: { lat: 47.637, lng: -122.365 },
-        needsRide: true,
-      },
-    ],
-    drivers: [
-      {
-        id: "driver-jordan",
-        groupId: "wed-dancers",
-        name: "Jordan Lee",
-        address: "Queen Anne",
-        origin: { lat: 47.638, lng: -122.366 },
-        seats: 3,
-      },
-    ],
-  },
-];
-
 function initials(name: string) {
   return name
     .split(/\s+/)
@@ -151,25 +37,21 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function coordinateFor(index: number, destination: Coordinate): Coordinate {
-  const ring = Math.floor(index / 6) + 1;
-  const angle = ((index % 6) * Math.PI) / 3;
-
-  return {
-    lat: destination.lat + Math.cos(angle) * 0.018 * ring,
-    lng: destination.lng + Math.sin(angle) * 0.024 * ring,
-  };
-}
-
-export function CarpoolApp({ memberName }: { memberName: string }) {
+export function CarpoolApp({
+  initialGroups,
+  memberName,
+}: {
+  initialGroups: AppGroup[];
+  memberName: string;
+}) {
   const router = useRouter();
-  const [groups, setGroups] = useState(initialGroups);
+  const groups = initialGroups;
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
   const [destination, setDestination] = useState<Destination>("rides");
   const [settingsPage, setSettingsPage] = useState<"about" | null>(null);
-  const [csv, setCsv] = useState(
-    "Jamie Park,Northgate meeting point\nRiley Stone,Roosevelt meeting point",
-  );
+  const [csv, setCsv] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupPin, setNewGroupPin] = useState("");
   const [plan, setPlan] = useState<SuggestionPlan | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -197,7 +79,7 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
   const coveredCount = plan
     ? plan.trips.reduce((total, trip) => total + trip.riderIds.length, 0)
     : Math.min(riders.length, availableSeats);
-  const fullyCovered = coveredCount >= riders.length;
+  const fullyCovered = riders.length > 0 && coveredCount >= riders.length;
 
   function switchGroup(groupId: string) {
     setActiveGroupId(groupId);
@@ -207,51 +89,78 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
     setSettingsPage(null);
   }
 
-  function importRoster() {
+  async function importRoster() {
     const rows = csv
       .split(/\r?\n/)
       .map((line) => line.split(",").map((cell) => cell.trim()))
-      .filter(([name, address]) => Boolean(name && address));
+      .filter(([name, phone]) => Boolean(name && phone));
 
     if (rows.length === 0) {
-      setError("Add at least one row in the format Name, Meeting point.");
+      setError("Add at least one row in the format Name, Phone.");
       return;
     }
 
-    setGroups((current) =>
-      current.map((item) => {
-        if (item.id !== group.id) {
-          return item;
-        }
-
-        const existingNames = new Set(
-          item.participants.map((participant) =>
-            participant.name.toLocaleLowerCase(),
-          ),
-        );
-        const imported = rows
-          .filter(([name]) => !existingNames.has(name.toLocaleLowerCase()))
-          .map(([name, address], index) => ({
-            id: `imported-${group.id}-${Date.now()}-${index}`,
-            groupId: group.id,
-            name,
-            address,
-            location: coordinateFor(
-              item.participants.length + index,
-              group.destination,
-            ),
-            needsRide: true,
-          }));
-
-        return {
-          ...item,
-          participants: [...item.participants, ...imported],
-        };
-      }),
-    );
-    setCsv("");
-    setPlan(null);
+    setLoading(true);
     setError("");
+
+    try {
+      const response = await fetch(`/api/groups/${group.id}/roster`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: rows.map(([displayName, phone]) => ({
+            displayName,
+            phone,
+            role: "member",
+          })),
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Could not update the roster.");
+      }
+
+      setCsv("");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not update the roster.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newGroupName, pin: newGroupPin }),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        groupId?: string;
+      };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Could not create the group.");
+      }
+
+      setNewGroupName("");
+      setNewGroupPin("");
+      if (result.groupId) setActiveGroupId(result.groupId);
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not create the group.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function generatePlan() {
@@ -376,6 +285,16 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
               <p>A little teamwork. Every ride.</p>
             </div>
 
+            {!group.event ? (
+              <section className="surface-card">
+                <h2>No events scheduled</h2>
+                <p className="text-muted">
+                  Event and ride planning will appear here after an organizer
+                  creates the group schedule.
+                </p>
+              </section>
+            ) : (
+              <>
             <section className="week-heading" aria-label="Week navigation">
               <button className="icon-button" type="button" aria-label="Previous week">
                 ‹
@@ -524,6 +443,8 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
                 </div>
               </article>
             </section>
+              </>
+            )}
           </>
         )}
 
@@ -565,29 +486,31 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
             <section className="surface-card roster-card">
               <div className="card-heading">
                 <h2>Group roster</h2>
-                <span>{group.participants.length} people</span>
+                <span>{group.roster.length} people</span>
               </div>
-              {group.participants.map((participant) => (
-                <div className="person-row" key={participant.id}>
-                  <div className="person-avatar">{initials(participant.name)}</div>
-                  <div>
-                    <strong>{participant.name}</strong>
-                    <span>{participant.address}</span>
+              {group.roster.map((member) => (
+                <div className="person-row" key={member.id}>
+                  <div className="person-avatar">
+                    {initials(member.displayName)}
                   </div>
-                  <small>
-                    {participant.needsRide ? "Needs ride" : "Covered"}
-                  </small>
+                  <div>
+                    <strong>{member.displayName}</strong>
+                    <span>{member.phone ?? "Phone hidden"}</span>
+                  </div>
+                  <small>{member.role}</small>
                 </div>
               ))}
             </section>
 
-            <h2 className="settings-section-title">Add from a larger group</h2>
+            {group.canManageRoster && (
+              <>
+            <h2 className="settings-section-title">Add members</h2>
             <section className="surface-card import-card">
               <div className="import-heading">
                 <Upload size={22} aria-hidden="true" />
                 <div>
                   <strong>Import selected people</strong>
-                  <span>Paste name and meeting point, one per line.</span>
+                  <span>Paste name and phone, one per line.</span>
                 </div>
               </div>
               <label>
@@ -596,18 +519,21 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
                   className="input roster-input"
                   value={csv}
                   onChange={(event) => setCsv(event.target.value)}
-                  placeholder="Name, Meeting point"
+                  placeholder={"Alex Morgan, 425-555-0100\nSam Rivera, 425-555-0101"}
                 />
               </label>
               <button
                 className="primary-button"
                 type="button"
                 onClick={importRoster}
+                disabled={loading}
               >
-                Add selected people
+                {loading ? "Adding…" : "Add selected people"}
               </button>
               {error && <p className="error">{error}</p>}
             </section>
+              </>
+            )}
           </>
         )}
 
@@ -691,7 +617,7 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
                 <CalendarDays size={22} aria-hidden="true" />
                 <span>
                   <strong>Group schedule</strong>
-                  <small>{group.event}</small>
+                  <small>{group.event ?? "No event scheduled"}</small>
                 </span>
                 <span aria-hidden="true">›</span>
               </button>
@@ -711,6 +637,45 @@ export function CarpoolApp({ memberName }: { memberName: string }) {
                 </span>
                 <span aria-hidden="true">›</span>
               </button>
+            </section>
+
+            <h2 className="settings-section-title">Create another group</h2>
+            <section className="surface-card">
+              <form className="auth-form" onSubmit={createGroup}>
+                <label htmlFor="new-group-name">Group name</label>
+                <div className="auth-input-wrap">
+                  <input
+                    id="new-group-name"
+                    required
+                    maxLength={100}
+                    value={newGroupName}
+                    onChange={(event) => setNewGroupName(event.target.value)}
+                    placeholder="Neighborhood carpool"
+                  />
+                </div>
+                <label htmlFor="new-group-pin">Shared group PIN</label>
+                <div className="auth-input-wrap">
+                  <input
+                    id="new-group-pin"
+                    required
+                    type="password"
+                    inputMode="numeric"
+                    minLength={4}
+                    maxLength={12}
+                    value={newGroupPin}
+                    onChange={(event) => setNewGroupPin(event.target.value)}
+                    placeholder="4 to 12 characters"
+                  />
+                </div>
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? "Creating…" : "Create group"}
+                </button>
+              </form>
+              {error && <p className="error">{error}</p>}
             </section>
           </>
         )}
