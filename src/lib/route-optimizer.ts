@@ -1,6 +1,11 @@
 export type GeoStop = {
   label: string;
   address: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+type ResolvedGeoStop = GeoStop & {
   latitude: number;
   longitude: number;
 };
@@ -10,15 +15,27 @@ export function optimizeStops(
   intermediate: GeoStop[],
   end: GeoStop,
 ) {
+  const allStops = [start, ...intermediate, end];
+  if (!allStops.every(hasCoordinates)) return allStops;
   if (intermediate.length < 2) return [start, ...intermediate, end];
+  const resolvedStart = start as ResolvedGeoStop;
+  const resolvedIntermediate = intermediate as ResolvedGeoStop[];
   if (intermediate.length > 8) {
-    return [start, ...nearestNeighbor(start, intermediate), end];
+    return [
+      start,
+      ...nearestNeighbor(resolvedStart, resolvedIntermediate),
+      end,
+    ];
   }
 
   let best = intermediate;
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (const order of permutations(intermediate)) {
-    const distance = routeDistance([start, ...order, end]);
+  for (const order of permutations(resolvedIntermediate)) {
+    const distance = routeDistance([
+      resolvedStart,
+      ...order,
+      end as ResolvedGeoStop,
+    ]);
     if (distance < bestDistance) {
       best = order;
       bestDistance = distance;
@@ -28,8 +45,8 @@ export function optimizeStops(
 }
 
 export function haversineMiles(
-  first: Pick<GeoStop, "latitude" | "longitude">,
-  second: Pick<GeoStop, "latitude" | "longitude">,
+  first: Pick<ResolvedGeoStop, "latitude" | "longitude">,
+  second: Pick<ResolvedGeoStop, "latitude" | "longitude">,
 ) {
   const radiusMiles = 3958.8;
   const latitudeDelta = radians(second.latitude - first.latitude);
@@ -44,9 +61,9 @@ export function haversineMiles(
   return radiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function nearestNeighbor(start: GeoStop, stops: GeoStop[]) {
+function nearestNeighbor(start: ResolvedGeoStop, stops: ResolvedGeoStop[]) {
   const remaining = [...stops];
-  const ordered: GeoStop[] = [];
+  const ordered: ResolvedGeoStop[] = [];
   let current = start;
   while (remaining.length) {
     remaining.sort(
@@ -60,7 +77,7 @@ function nearestNeighbor(start: GeoStop, stops: GeoStop[]) {
   return ordered;
 }
 
-function routeDistance(route: GeoStop[]) {
+function routeDistance(route: ResolvedGeoStop[]) {
   return route
     .slice(1)
     .reduce(
@@ -80,4 +97,13 @@ function permutations<T>(items: T[]): T[][] {
 
 function radians(degrees: number) {
   return (degrees * Math.PI) / 180;
+}
+
+export function hasCoordinates(stop: GeoStop): stop is ResolvedGeoStop {
+  return (
+    stop.latitude !== null &&
+    stop.longitude !== null &&
+    Number.isFinite(stop.latitude) &&
+    Number.isFinite(stop.longitude)
+  );
 }

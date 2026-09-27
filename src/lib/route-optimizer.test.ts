@@ -39,3 +39,22 @@ test("uses a bounded deterministic order for large carpools", () => {
     Array.from({ length: 9 }, (_, index) => `Stop ${index}`),
   );
 });
+
+test("preserves the entered stop order when coordinates are unavailable", () => {
+  const unresolved: GeoStop = {
+    label: "Address only",
+    address: "123 Example Street",
+    latitude: null,
+    longitude: null,
+  };
+  const route = optimizeStops(
+    stop("Start", 47.6, -122.2),
+    [unresolved, stop("Resolved", 47.7, -122.2)],
+    stop("End", 47.8, -122.2),
+  );
+
+  assert.deepEqual(
+    route.map((item) => item.label),
+    ["Start", "Address only", "Resolved", "End"],
+  );
+});

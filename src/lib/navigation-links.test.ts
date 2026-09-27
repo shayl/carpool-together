@@ -21,3 +21,17 @@ test("builds Apple Maps and Waze links for one stop", () => {
   assert.match(singleStopUrl("apple", stops[1]), /^https:\/\/maps\.apple\.com/);
   assert.match(singleStopUrl("waze", stops[1]), /^https:\/\/www\.waze\.com/);
 });
+
+test("uses a street address when coordinates are unavailable", () => {
+  const destination: GeoStop = {
+    label: "Destination",
+    address: "123 Example Street",
+    latitude: null,
+    longitude: null,
+  };
+
+  assert.match(
+    singleStopUrl("apple", destination),
+    /daddr=123%20Example%20Street/,
+  );
+});

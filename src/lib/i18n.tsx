@@ -248,6 +248,8 @@ export const hebrew: Record<string, string> = {
     "אין כרגע חברים הזקוקים לנסיעה הזו.",
   "Driving family not found.": "המשפחה המסיעה לא נמצאה.",
   "Event venue not found.": "מקום האירוע לא נמצא.",
+  "Some addresses could not be geocoded. Your maps app will determine the stop order.":
+    "לא ניתן היה לאתר חלק מהכתובות. אפליקציית המפות תקבע את סדר העצירות.",
   "Add missing household and venue addresses before opening this route.":
     "הוסיפו את כתובות משקי הבית והמקום החסרות לפני פתיחת המסלול.",
   "One or more route addresses could not be located.":

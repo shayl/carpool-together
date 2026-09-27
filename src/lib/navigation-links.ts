@@ -1,4 +1,4 @@
-import type { GeoStop } from "./route-optimizer";
+import { hasCoordinates, type GeoStop } from "./route-optimizer";
 
 export type NavigationProvider = "google" | "apple" | "waze";
 
@@ -25,5 +25,7 @@ export function singleStopUrl(
 }
 
 function coordinate(stop: GeoStop) {
-  return `${stop.latitude},${stop.longitude}`;
+  return hasCoordinates(stop)
+    ? `${stop.latitude},${stop.longitude}`
+    : stop.address;
 }

@@ -675,6 +675,7 @@ function RouteLauncher({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [route, setRoute] = useState<GeoStop[] | null>(null);
+  const [routeOptimized, setRouteOptimized] = useState(true);
   const [choosing, setChoosing] = useState(false);
   const [sequentialProvider, setSequentialProvider] = useState<
     Exclude<NavigationProvider, "google"> | null
@@ -698,11 +699,13 @@ function RouteLauncher({
     const result = (await response.json().catch(() => null)) as {
       error?: string;
       stops?: GeoStop[];
+      optimized?: boolean;
     } | null;
     if (!response.ok || !result?.stops) {
       throw new Error(result?.error ?? t("Could not build route."));
     }
     setRoute(result.stops);
+    setRouteOptimized(result.optimized !== false);
     return result.stops;
   }
 
@@ -814,6 +817,13 @@ function RouteLauncher({
                 "Google Maps opens every stop. Apple Maps and Waze guide one stop at a time.",
               )}
             </p>
+            {!routeOptimized && (
+              <p className="auth-message">
+                {t(
+                  "Some addresses could not be geocoded. Your maps app will determine the stop order.",
+                )}
+              </p>
+            )}
             <RouteStops stops={route} />
             <div className="route-provider-actions">
               {(["google", "apple", "waze"] as NavigationProvider[]).map(

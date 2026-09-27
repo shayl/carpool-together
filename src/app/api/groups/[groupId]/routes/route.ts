@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { optimizeStops, type GeoStop } from "@/lib/route-optimizer";
+import {
+  hasCoordinates,
+  optimizeStops,
+  type GeoStop,
+} from "@/lib/route-optimizer";
 import { apiError, requireGroupRole } from "@/lib/server-auth";
 
 const routeSchema = z.object({
@@ -209,7 +213,11 @@ export async function POST(
         ? optimizeStops(locationStop, passengerStops, driverStop)
         : optimizeStops(driverStop, passengerStops, locationStop);
 
-    return Response.json({ leg: input.data.leg, stops });
+    return Response.json({
+      leg: input.data.leg,
+      stops,
+      optimized: stops.every(hasCoordinates),
+    });
   } catch (error) {
     return apiError(error);
   }
@@ -245,28 +253,27 @@ async function resolveStop(
     format: "jsonv2",
     limit: "1",
   }).toString();
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "CarpoolTogether/1.0",
-      Accept: "application/json",
-    },
-    next: { revalidate: 86400 },
-  });
-  if (!response.ok) {
-    throw Response.json(
-      { error: "One or more route addresses could not be located." },
-      { status: 502 },
-    );
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        "User-Agent": "CarpoolTogether/1.0",
+        Accept: "application/json",
+      },
+      next: { revalidate: 86400 },
+    });
+  } catch {
+    return unresolvedStop(record);
   }
-  const [result] = (await response.json()) as Array<{
+  if (!response.ok) {
+    return unresolvedStop(record);
+  }
+  const [result] = (await response.json().catch(() => [])) as Array<{
     lat: string;
     lon: string;
   }>;
   if (!result) {
-    throw Response.json(
-      { error: "One or more route addresses could not be located." },
-      { status: 400 },
-    );
+    return unresolvedStop(record);
   }
 
   const latitude = Number(result.lat);
@@ -283,5 +290,16 @@ async function resolveStop(
     address: record.address,
     latitude,
     longitude,
+  };
+}
+
+function unresolvedStop(
+  record: CoordinateRecord & { label: string },
+): GeoStop {
+  return {
+    label: record.label,
+    address: record.address,
+    latitude: null,
+    longitude: null,
   };
 }
