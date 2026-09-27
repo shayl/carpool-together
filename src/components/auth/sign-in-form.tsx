@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/browser";
 
 export function SignInForm() {
   const router = useRouter();
+  const { t } = useI18n();
   const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
   const [groupName, setGroupName] = useState("");
   const [memberName, setMemberName] = useState("");
@@ -32,7 +34,7 @@ export function SignInForm() {
     }
 
     const accessToken = data.session?.access_token;
-    if (!accessToken) throw new Error("Could not create a device session.");
+    if (!accessToken) throw new Error(t("Could not create a device session."));
     return accessToken;
   }
 
@@ -59,7 +61,9 @@ export function SignInForm() {
       if (!response.ok) {
         throw new Error(
           result.error ??
-            (registering ? "Could not create the group." : "Sign-in failed."),
+            (registering
+              ? t("Could not create the group.")
+              : t("Sign-in failed.")),
         );
       }
 
@@ -69,8 +73,8 @@ export function SignInForm() {
         caught instanceof Error
           ? caught.message
           : mode === "register"
-            ? "Could not create the group."
-            : "Sign-in failed.",
+            ? t("Could not create the group.")
+            : t("Sign-in failed."),
       );
       setBusy(false);
     }
@@ -93,19 +97,25 @@ export function SignInForm() {
         <div>
           <p className="auth-eyebrow">Carpool Together</p>
           <h1 id="sign-in-heading">
-            {registering ? "Create your group" : "Sign in to your groups"}
+            {registering
+              ? t("Create your group")
+              : t("Sign in to your groups")}
           </h1>
           <p className="auth-description">
             {registering
-              ? "Start a private group and invite members with their phone number."
-              : "Use the phone number on your group roster and the shared group PIN."}
+              ? t(
+                  "Start a private group and invite members with their phone number.",
+                )
+              : t(
+                  "Use the phone number on your group roster and the shared group PIN.",
+                )}
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           {registering && (
             <>
-              <label htmlFor="group-name">Group name</label>
+              <label htmlFor="group-name">{t("Group name")}</label>
               <div className="auth-input-wrap">
                 <input
                   id="group-name"
@@ -113,10 +123,10 @@ export function SignInForm() {
                   maxLength={100}
                   value={groupName}
                   onChange={(event) => setGroupName(event.target.value)}
-                  placeholder="Neighborhood carpool"
+                  placeholder={t("Neighborhood carpool")}
                 />
               </div>
-              <label htmlFor="member-name">Your name</label>
+              <label htmlFor="member-name">{t("Your name")}</label>
               <div className="auth-input-wrap">
                 <input
                   id="member-name"
@@ -125,12 +135,12 @@ export function SignInForm() {
                   autoComplete="name"
                   value={memberName}
                   onChange={(event) => setMemberName(event.target.value)}
-                  placeholder="Alex Morgan"
+                  placeholder={t("Alex Morgan")}
                 />
               </div>
             </>
           )}
-          <label htmlFor="phone">Phone number</label>
+          <label htmlFor="phone">{t("Phone number")}</label>
           <div className="auth-input-wrap">
             <input
               id="phone"
@@ -146,9 +156,9 @@ export function SignInForm() {
             />
           </div>
           <p id="phone-hint" className="auth-footnote">
-            For US numbers, enter all 10 digits. No +1 needed.
+            {t("For US numbers, enter all 10 digits. No +1 needed.")}
           </p>
-          <label htmlFor="pin">Group PIN</label>
+          <label htmlFor="pin">{t("Group PIN")}</label>
           <div className="auth-input-wrap">
             <input
               id="pin"
@@ -161,17 +171,17 @@ export function SignInForm() {
               required
               value={pin}
               onChange={(event) => setPin(event.target.value)}
-              placeholder="Shared group PIN"
+              placeholder={t("Shared group PIN")}
             />
           </div>
           <button className="primary-button" type="submit" disabled={busy}>
             {busy
               ? registering
-                ? "Creating group…"
-                : "Signing in…"
+                ? t("Creating group…")
+                : t("Signing in…")
               : registering
-                ? "Register and create group"
-                : "Open my groups"}
+                ? t("Register and create group")
+                : t("Open my groups")}
           </button>
         </form>
 
@@ -183,22 +193,24 @@ export function SignInForm() {
         <div className="auth-switch">
           <span>
             {registering
-              ? "Already belong to a group?"
-              : "Starting a new carpool group?"}
+              ? t("Already belong to a group?")
+              : t("Starting a new carpool group?")}
           </span>
           <button
             type="button"
             onClick={() => changeMode(registering ? "sign-in" : "register")}
             disabled={busy}
           >
-            {registering ? "Sign in" : "Register and create a group"}
+            {registering ? t("Sign in") : t("Register and create a group")}
           </button>
         </div>
         <p className="auth-footnote">
           {registering
-            ? "By creating a group, you agree to handle member information responsibly. "
-            : "Ask a group organizer if you do not know the PIN. "}
-          <Link href="/privacy">Privacy notice</Link>
+            ? t(
+                "By creating a group, you agree to handle member information responsibly. ",
+              )
+            : t("Ask a group organizer if you do not know the PIN. ")}
+          <Link href="/privacy">{t("Privacy notice")}</Link>
         </p>
       </section>
     </main>

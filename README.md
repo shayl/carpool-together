@@ -11,6 +11,7 @@ Carpool database or reuse that application's credentials.
 
 - Create and switch between private database-backed groups.
 - Register and create a first group without deployment-level secrets.
+- Switch between English and Hebrew with persistent RTL localization.
 - Protect each group with a private phone roster and hashed shared PIN.
 - Let owners import roster members from pasted name/phone data.
 - Send validated requests to a server-side suggestion endpoint.

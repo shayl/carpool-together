@@ -17,6 +17,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppGroup } from "@/lib/app-data";
 import type { SuggestionPlan } from "@/lib/carpool";
+import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/browser";
 
 type Destination = "rides" | "family" | "team" | "settings";
@@ -45,6 +46,7 @@ export function CarpoolApp({
   memberName: string;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const groups = initialGroups;
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
   const [destination, setDestination] = useState<Destination>("rides");
@@ -96,7 +98,7 @@ export function CarpoolApp({
       .filter(([name, phone]) => Boolean(name && phone));
 
     if (rows.length === 0) {
-      setError("Add at least one row in the format Name, Phone.");
+      setError(t("Add at least one row in the format Name, Phone."));
       return;
     }
 
@@ -117,14 +119,20 @@ export function CarpoolApp({
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(result.error ?? "Could not update the roster.");
+        throw new Error(
+          result.error
+            ? t(result.error)
+            : t("Could not update the roster."),
+        );
       }
 
       setCsv("");
       router.refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not update the roster.",
+        caught instanceof Error
+          ? caught.message
+          : t("Could not update the roster."),
       );
     } finally {
       setLoading(false);
@@ -147,7 +155,11 @@ export function CarpoolApp({
         groupId?: string;
       };
       if (!response.ok) {
-        throw new Error(result.error ?? "Could not create the group.");
+        throw new Error(
+          result.error
+            ? t(result.error)
+            : t("Could not create the group."),
+        );
       }
 
       setNewGroupName("");
@@ -156,7 +168,9 @@ export function CarpoolApp({
       router.refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not create the group.",
+        caught instanceof Error
+          ? caught.message
+          : t("Could not create the group."),
       );
     } finally {
       setLoading(false);
@@ -181,13 +195,17 @@ export function CarpoolApp({
       const result: SuggestionPlan | { error: string } = await response.json();
 
       if (!response.ok || "error" in result) {
-        throw new Error("error" in result ? result.error : "Unable to plan rides.");
+        throw new Error(
+          "error" in result
+            ? t(result.error)
+            : t("Unable to plan rides."),
+        );
       }
 
       setPlan(result);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Unable to plan rides.",
+        caught instanceof Error ? caught.message : t("Unable to plan rides."),
       );
     } finally {
       setLoading(false);
@@ -214,7 +232,7 @@ export function CarpoolApp({
       style={{ "--team": group.accent } as React.CSSProperties}
     >
       <a className="skip-link" href="#main-content">
-        Skip to content
+        {t("Skip to content")}
       </a>
       <header className="app-header">
         <div className="app-header-inner">
@@ -223,13 +241,13 @@ export function CarpoolApp({
               {group.shortName}
             </div>
             <div className="brand-copy">
-              <p>{group.name} Carpool</p>
+              <p>{t("{{group}} Carpool", { group: group.name })}</p>
               <span>{memberName}</span>
             </div>
           </div>
           <div className="header-actions">
             <label className="group-switcher">
-              <span className="sr-only">Active group</span>
+              <span className="sr-only">{t("Active group")}</span>
               <select
                 value={activeGroupId}
                 onChange={(event) => switchGroup(event.target.value)}
@@ -245,8 +263,8 @@ export function CarpoolApp({
             <button
               className="icon-button"
               type="button"
-              aria-label="Sign out"
-              title="Sign out"
+              aria-label={t("Sign out")}
+              title={t("Sign out")}
               disabled={signingOut}
               onClick={signOut}
             >
@@ -256,7 +274,7 @@ export function CarpoolApp({
         </div>
       </header>
 
-      <nav className="app-navigation" aria-label="Main navigation">
+      <nav className="app-navigation" aria-label={t("Main navigation")}>
         {destinations.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -272,7 +290,7 @@ export function CarpoolApp({
             }
           >
             <Icon size={21} aria-hidden="true" />
-            <span>{label}</span>
+            <span>{t(label)}</span>
           </button>
         ))}
       </nav>
@@ -281,29 +299,30 @@ export function CarpoolApp({
         {destination === "rides" && (
           <>
             <div className="screen-heading">
-              <h1>Rides</h1>
-              <p>A little teamwork. Every ride.</p>
+              <h1>{t("Rides")}</h1>
+              <p>{t("A little teamwork. Every ride.")}</p>
             </div>
 
             {!group.event ? (
               <section className="surface-card">
-                <h2>No events scheduled</h2>
+                <h2>{t("No events scheduled")}</h2>
                 <p className="text-muted">
-                  Event and ride planning will appear here after an organizer
-                  creates the group schedule.
+                  {t(
+                    "Event and ride planning will appear here after an organizer creates the group schedule.",
+                  )}
                 </p>
               </section>
             ) : (
               <>
-            <section className="week-heading" aria-label="Week navigation">
-              <button className="icon-button" type="button" aria-label="Previous week">
+            <section className="week-heading" aria-label={t("Week navigation")}>
+              <button className="icon-button" type="button" aria-label={t("Previous week")}>
                 ‹
               </button>
               <div>
-                <strong>This week</strong>
-                <span>Sep 21 – Sep 27</span>
+                <strong>{t("This week")}</strong>
+                <span>{t("Sep 21 – Sep 27")}</span>
               </div>
-              <button className="icon-button" type="button" aria-label="Next week">
+              <button className="icon-button" type="button" aria-label={t("Next week")}>
                 ›
               </button>
             </section>
@@ -316,24 +335,29 @@ export function CarpoolApp({
               <span>
                 <strong>
                   {fullyCovered
-                    ? "Every ride has a seat"
-                    : `${riders.length - coveredCount} rides need help`}
+                    ? t("Every ride has a seat")
+                    : t("{{count}} rides need help", {
+                        count: riders.length - coveredCount,
+                      })}
                 </strong>
               </span>
               <span>
-                {coveredCount} of {riders.length} covered
+                {t("{{covered}} of {{total}} covered", {
+                  covered: coveredCount,
+                  total: riders.length,
+                })}
               </span>
             </div>
 
-            <div className="ride-filters" aria-label="Ride filters">
+            <div className="ride-filters" aria-label={t("Ride filters")}>
               <button type="button" aria-pressed="true">
-                All
+                {t("All")}
               </button>
               <button type="button" aria-pressed="false">
-                Needs a family
+                {t("Needs a family")}
               </button>
               <button type="button" aria-pressed="false">
-                My family
+                {t("My family")}
               </button>
             </div>
 
@@ -341,8 +365,8 @@ export function CarpoolApp({
               <article className="weekly-event">
                 <div className="weekly-event-summary">
                   <div className="weekly-event-date">
-                    <strong>Thu 24</strong>
-                    <span>5:30 PM</span>
+                    <strong>{t("Thu 24")}</strong>
+                    <span>{t("5:30 PM")}</span>
                   </div>
                   <div className="weekly-event-name">
                     <strong>{group.event.split(" at ")[0]}</strong>
@@ -358,7 +382,7 @@ export function CarpoolApp({
                       aria-hidden="true"
                     />
                     <span>
-                      {fullyCovered ? "Covered" : "Needs a driver"}
+                      {fullyCovered ? t("Covered") : t("Needs a driver")}
                     </span>
                   </div>
                   <ChevronDown className="weekly-event-chevron" size={20} />
@@ -367,9 +391,12 @@ export function CarpoolApp({
                 <div className="weekly-event-details">
                   <div className="event-detail-heading">
                     <div>
-                      <strong>Homeward ride</strong>
+                      <strong>{t("Homeward ride")}</strong>
                       <span>
-                        {riders.length} riders · {availableSeats} seats offered
+                        {t("{{riders}} riders · {{seats}} seats offered", {
+                          riders: riders.length,
+                          seats: availableSeats,
+                        })}
                       </span>
                     </div>
                     <button
@@ -378,7 +405,7 @@ export function CarpoolApp({
                       onClick={generatePlan}
                       disabled={loading}
                     >
-                      {loading ? "Planning…" : "Suggest carpools"}
+                      {loading ? t("Planning…") : t("Suggest carpools")}
                     </button>
                   </div>
 
@@ -390,7 +417,7 @@ export function CarpoolApp({
                           <strong>{driver.name}</strong>
                           <span>
                             {driver.address} · {driver.seats}{" "}
-                            {driver.seats === 1 ? "seat" : "seats"}
+                            {driver.seats === 1 ? t("seat") : t("seats")}
                           </span>
                         </div>
                       </div>
@@ -402,8 +429,8 @@ export function CarpoolApp({
                       <div className="suggestion-title">
                         <ShieldCheck size={19} aria-hidden="true" />
                         <div>
-                          <strong>Suggested plan</strong>
-                          <span>Draft until each driver accepts</span>
+                          <strong>{t("Suggested plan")}</strong>
+                          <span>{t("Draft until each driver accepts")}</span>
                         </div>
                       </div>
                       {plan.trips.map((trip) => (
@@ -417,17 +444,22 @@ export function CarpoolApp({
                                       participantById.get(id)?.name ?? id,
                                   )
                                   .join(", ")
-                              : "No pickup needed"}
+                              : t("No pickup needed")}
                           </span>
                           <small>
-                            +{trip.estimatedDetourMiles} mi estimated ·{" "}
-                            {trip.seatsRemaining} seats left
+                            {t(
+                              "+{{miles}} mi estimated · {{seats}} seats left",
+                              {
+                                miles: trip.estimatedDetourMiles,
+                                seats: trip.seatsRemaining,
+                              },
+                            )}
                           </small>
                         </div>
                       ))}
                       {plan.unassigned.length > 0 && (
                         <p className="unassigned">
-                          <strong>Still needs a seat:</strong>{" "}
+                          <strong>{t("Still needs a seat:")}</strong>{" "}
                           {plan.unassigned
                             .map(
                               (item) =>
@@ -451,26 +483,32 @@ export function CarpoolApp({
         {destination === "family" && (
           <>
             <div className="screen-heading">
-              <h1>My family</h1>
-              <p>Your riders, your plans.</p>
+              <h1>{t("My family")}</h1>
+              <p>{t("Your riders, your plans.")}</p>
             </div>
             <section className="surface-card">
               <div className="family-member">
                 <div className="person-avatar person-avatar-large">
-                  {initials(group.participants[0]?.name ?? "Family")}
+                  {initials(group.participants[0]?.name ?? t("Family"))}
                 </div>
                 <div>
-                  <strong>{group.participants[0]?.name ?? "No rider yet"}</strong>
+                  <strong>
+                    {group.participants[0]?.name ?? t("No rider yet")}
+                  </strong>
                   <span>{group.participants[0]?.address}</span>
                 </div>
               </div>
               <div className="ride-row">
                 <div className="ride-row-main">
                   <div>
-                    <strong>Thursday practice</strong>
-                    <p className="text-muted">Homeward ride requested</p>
+                    <strong>{t("Thursday practice")}</strong>
+                    <p className="text-muted">
+                      {t("Homeward ride requested")}
+                    </p>
                   </div>
-                  <span className="status-label status-covered">Covered</span>
+                  <span className="status-label status-covered">
+                    {t("Covered")}
+                  </span>
                 </div>
               </div>
             </section>
@@ -480,13 +518,15 @@ export function CarpoolApp({
         {destination === "team" && (
           <>
             <div className="screen-heading">
-              <h1>Team</h1>
-              <p>The people who keep everyone moving.</p>
+              <h1>{t("Team")}</h1>
+              <p>{t("The people who keep everyone moving.")}</p>
             </div>
             <section className="surface-card roster-card">
               <div className="card-heading">
-                <h2>Group roster</h2>
-                <span>{group.roster.length} people</span>
+                <h2>{t("Group roster")}</h2>
+                <span>
+                  {t("{{count}} people", { count: group.roster.length })}
+                </span>
               </div>
               {group.roster.map((member) => (
                 <div className="person-row" key={member.id}>
@@ -495,31 +535,31 @@ export function CarpoolApp({
                   </div>
                   <div>
                     <strong>{member.displayName}</strong>
-                    <span>{member.phone ?? "Phone hidden"}</span>
+                    <span>{member.phone ?? t("Phone hidden")}</span>
                   </div>
-                  <small>{member.role}</small>
+                  <small>{t(member.role)}</small>
                 </div>
               ))}
             </section>
 
             {group.canManageRoster && (
               <>
-            <h2 className="settings-section-title">Add members</h2>
+            <h2 className="settings-section-title">{t("Add members")}</h2>
             <section className="surface-card import-card">
               <div className="import-heading">
                 <Upload size={22} aria-hidden="true" />
                 <div>
-                  <strong>Import selected people</strong>
-                  <span>Paste name and phone, one per line.</span>
+                  <strong>{t("Import selected people")}</strong>
+                  <span>{t("Paste name and phone, one per line.")}</span>
                 </div>
               </div>
               <label>
-                <span className="sr-only">Roster rows</span>
+                <span className="sr-only">{t("Roster rows")}</span>
                 <textarea
                   className="input roster-input"
                   value={csv}
                   onChange={(event) => setCsv(event.target.value)}
-                  placeholder={"Alex Morgan, 425-555-0100\nSam Rivera, 425-555-0101"}
+                  placeholder={`${t("Alex Morgan")}, 425-555-0100\nSam Rivera, 425-555-0101`}
                 />
               </label>
               <button
@@ -528,7 +568,7 @@ export function CarpoolApp({
                 onClick={importRoster}
                 disabled={loading}
               >
-                {loading ? "Adding…" : "Add selected people"}
+                {loading ? t("Adding…") : t("Add selected people")}
               </button>
               {error && <p className="error">{error}</p>}
             </section>
@@ -545,51 +585,47 @@ export function CarpoolApp({
               onClick={() => setSettingsPage(null)}
             >
               <ArrowLeft size={18} aria-hidden="true" />
-              Settings
+              {t("Settings")}
             </button>
             <div className="screen-heading">
-              <h1>About</h1>
-              <p>Private groups. Smarter rides.</p>
+              <h1>{t("About")}</h1>
+              <p>{t("Private groups. Smarter rides.")}</p>
             </div>
 
             <section className="surface-card about-card">
               <div className="about-heading">
                 <Info size={24} aria-hidden="true" />
                 <div>
-                  <h2>Important notice</h2>
-                  <p>Please understand the limits of this service.</p>
+                  <h2>{t("Important notice")}</h2>
+                  <p>{t("Please understand the limits of this service.")}</p>
                 </div>
               </div>
               <div className="legal-copy">
                 <p>
-                  Carpool Together is a coordination tool. It is not a
-                  transportation provider, rideshare broker, employer, insurer,
-                  background-check service, or emergency service.
+                  {t(
+                    "Carpool Together is a coordination tool. It is not a transportation provider, rideshare broker, employer, insurer, background-check service, or emergency service.",
+                  )}
                 </p>
                 <p>
-                  The service does not verify drivers, vehicles, licenses,
-                  insurance, child-restraint equipment, routes, schedules, or
-                  safety. Users and group organizers decide whether to offer or
-                  accept a ride and remain responsible for following applicable
-                  laws and confirming that each ride is appropriate.
+                  {t(
+                    "The service does not verify drivers, vehicles, licenses, insurance, child-restraint equipment, routes, schedules, or safety. Users and group organizers decide whether to offer or accept a ride and remain responsible for following applicable laws and confirming that each ride is appropriate.",
+                  )}
                 </p>
                 <p>
-                  Route, timing, capacity, and carpool suggestions are estimates
-                  for planning only. They are not guarantees. Do not rely on the
-                  service for emergencies or time-critical transportation.
+                  {t(
+                    "Route, timing, capacity, and carpool suggestions are estimates for planning only. They are not guarantees. Do not rely on the service for emergencies or time-critical transportation.",
+                  )}
                 </p>
                 <p>
-                  To the fullest extent permitted by applicable law, this proof
-                  service is provided “as is” and “as available,” without
-                  warranties. Use it at your own risk. Nothing in this notice
-                  limits rights or responsibilities that cannot legally be
-                  waived.
+                  {t(
+                    "To the fullest extent permitted by applicable law, this proof service is provided “as is” and “as available,” without warranties. Use it at your own risk. Nothing in this notice limits rights or responsibilities that cannot legally be waived.",
+                  )}
                 </p>
               </div>
               <div className="legal-review-note">
-                This notice is not legal advice or a replacement for complete
-                Terms of Service and a Privacy Policy. Obtain review from a
-                qualified attorney before a public launch.
+                {t(
+                  "This notice is not legal advice or a replacement for complete Terms of Service and a Privacy Policy. Obtain review from a qualified attorney before a public launch.",
+                )}
               </div>
             </section>
           </>
@@ -598,17 +634,19 @@ export function CarpoolApp({
         {destination === "settings" && settingsPage === null && (
           <>
             <div className="screen-heading">
-              <h1>Settings</h1>
+              <h1>{t("Settings")}</h1>
               <p>{group.name}</p>
             </div>
-            <h2 className="settings-section-title">Active group</h2>
+            <h2 className="settings-section-title">{t("Active group")}</h2>
             <section className="settings-link-card">
               <button type="button">
                 <Users size={22} aria-hidden="true" />
                 <span>
-                  <strong>Switch group</strong>
+                  <strong>{t("Switch group")}</strong>
                   <small>
-                    Your account belongs to {groups.length} private groups.
+                    {t("Your account belongs to {{count}} private groups.", {
+                      count: groups.length,
+                    })}
                   </small>
                 </span>
                 <span aria-hidden="true">›</span>
@@ -616,33 +654,39 @@ export function CarpoolApp({
               <button type="button">
                 <CalendarDays size={22} aria-hidden="true" />
                 <span>
-                  <strong>Group schedule</strong>
-                  <small>{group.event ?? "No event scheduled"}</small>
+                  <strong>{t("Group schedule")}</strong>
+                  <small>{group.event ?? t("No event scheduled")}</small>
                 </span>
                 <span aria-hidden="true">›</span>
               </button>
               <button type="button">
                 <ShieldCheck size={22} aria-hidden="true" />
                 <span>
-                  <strong>Privacy and consent</strong>
-                  <small>Addresses stay private to authorized rides.</small>
+                  <strong>{t("Privacy and consent")}</strong>
+                  <small>
+                    {t("Addresses stay private to authorized rides.")}
+                  </small>
                 </span>
                 <span aria-hidden="true">›</span>
               </button>
               <button type="button" onClick={() => setSettingsPage("about")}>
                 <Info size={22} aria-hidden="true" />
                 <span>
-                  <strong>About and important notice</strong>
-                  <small>What this service does—and does not—provide.</small>
+                  <strong>{t("About and important notice")}</strong>
+                  <small>
+                    {t("What this service does—and does not—provide.")}
+                  </small>
                 </span>
                 <span aria-hidden="true">›</span>
               </button>
             </section>
 
-            <h2 className="settings-section-title">Create another group</h2>
+            <h2 className="settings-section-title">
+              {t("Create another group")}
+            </h2>
             <section className="surface-card">
               <form className="auth-form" onSubmit={createGroup}>
-                <label htmlFor="new-group-name">Group name</label>
+                <label htmlFor="new-group-name">{t("Group name")}</label>
                 <div className="auth-input-wrap">
                   <input
                     id="new-group-name"
@@ -650,10 +694,10 @@ export function CarpoolApp({
                     maxLength={100}
                     value={newGroupName}
                     onChange={(event) => setNewGroupName(event.target.value)}
-                    placeholder="Neighborhood carpool"
+                    placeholder={t("Neighborhood carpool")}
                   />
                 </div>
-                <label htmlFor="new-group-pin">Shared group PIN</label>
+                <label htmlFor="new-group-pin">{t("Shared group PIN")}</label>
                 <div className="auth-input-wrap">
                   <input
                     id="new-group-pin"
@@ -664,7 +708,7 @@ export function CarpoolApp({
                     maxLength={12}
                     value={newGroupPin}
                     onChange={(event) => setNewGroupPin(event.target.value)}
-                    placeholder="4 to 12 characters"
+                    placeholder={t("4 to 12 characters")}
                   />
                 </div>
                 <button
@@ -672,7 +716,7 @@ export function CarpoolApp({
                   type="submit"
                   disabled={loading}
                 >
-                  {loading ? "Creating…" : "Create group"}
+                  {loading ? t("Creating…") : t("Create group")}
                 </button>
               </form>
               {error && <p className="error">{error}</p>}
