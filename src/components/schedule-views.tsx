@@ -11,6 +11,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
+import { enUS, he as hebrewLocale } from "date-fns/locale";
 import {
   CalendarDays,
   Car,
@@ -53,8 +54,23 @@ type Props = {
 
 const eventTypes: EventType[] = ["practice", "game", "competition"];
 
+function displayDate(date: Date, pattern: string, locale: "en" | "he") {
+  return format(date, pattern, {
+    locale: locale === "he" ? hebrewLocale : enUS,
+  });
+}
+
 function eventTitle(event: GroupEvent) {
-  return event.title || event.eventType;
+  if (event.title) return event.title;
+  if (event.eventType === "game") return "Special event";
+  if (event.eventType === "competition") return "Trip or competition";
+  return "Regular event";
+}
+
+function eventTypeLabel(eventType: EventType) {
+  if (eventType === "game") return "Special event";
+  if (eventType === "competition") return "Trip or competition";
+  return "Regular event";
 }
 
 function legKey(leg: RideLeg) {
@@ -66,7 +82,7 @@ async function readResult(response: Response) {
     error?: string;
   } | null;
   if (!response.ok) {
-    throw new Error(result?.error ?? `Request failed (${response.status}).`);
+    throw new Error(result?.error ?? "Change failed.");
   }
 }
 
@@ -167,8 +183,8 @@ function RidesSchedule({ groupId, groupName, schedule }: Props) {
     const lines = [
       `*${groupName}*`,
       display === "week"
-        ? `${format(cursor, "MMM d")}–${format(weekEnd, "MMM d, yyyy")}`
-        : format(cursor, "MMMM yyyy"),
+        ? `${displayDate(cursor, "MMM d", locale)}–${displayDate(weekEnd, "MMM d, yyyy", locale)}`
+        : displayDate(cursor, "MMMM yyyy", locale),
       "",
     ];
     for (const event of visibleEvents) {
@@ -176,7 +192,7 @@ function RidesSchedule({ groupId, groupName, schedule }: Props) {
         (item) => item.id === event.locationId,
       );
       lines.push(
-        `*${eventTitle(event)} · ${format(parseISO(event.date), "EEE, MMM d")} · ${event.startTime}*`,
+        `*${t(eventTitle(event))} · ${displayDate(parseISO(event.date), "EEE, MMM d", locale)} · ${event.startTime}*`,
       );
       if (location) lines.push(location.name);
       for (const leg of requiredLegs(event)) {
@@ -205,8 +221,8 @@ function RidesSchedule({ groupId, groupName, schedule }: Props) {
         <h1>{t("Rides")}</h1>
         <p>
           {display === "week"
-            ? `${format(cursor, "MMM d")}–${format(weekEnd, "MMM d, yyyy")}`
-            : format(cursor, "MMMM yyyy")}
+            ? `${displayDate(cursor, "MMM d", locale)}–${displayDate(weekEnd, "MMM d, yyyy", locale)}`
+            : displayDate(cursor, "MMMM yyyy", locale)}
         </p>
       </div>
       <section className="schedule-toolbar">
@@ -350,6 +366,7 @@ function MonthGrid({
   locale: "en" | "he";
   onOpen: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const monthStart = startOfMonth(cursor);
   const days = eachDayOfInterval({
     start: monthStart,
@@ -387,7 +404,7 @@ function MonthGrid({
                     onClick={() => onOpen(event.id)}
                   >
                     <strong>{event.startTime}</strong>
-                    <span>{eventTitle(event)}</span>
+                    <span>{t(eventTitle(event))}</span>
                   </button>
                 ))}
               </div>
@@ -412,7 +429,7 @@ function EventCard({
   onToggle: () => void;
   mutation: ReturnType<typeof useMutation>;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const location = schedule.locations.find(
     (item) => item.id === event.locationId,
   );
@@ -427,8 +444,8 @@ function EventCard({
         onClick={onToggle}
       >
         <span className="weekly-event-date">
-          <strong>{format(parseISO(event.date), "EEE")}</strong>
-          <span>{format(parseISO(event.date), "MMM d")}</span>
+          <strong>{displayDate(parseISO(event.date), "EEE", locale)}</strong>
+          <span>{displayDate(parseISO(event.date), "MMM d", locale)}</span>
         </span>
         <span className="weekly-event-name">
           <strong>{t(eventTitle(event))}</strong>
@@ -641,7 +658,7 @@ function AttendancePanel({
 }
 
 function FamilySchedule({ groupId, schedule }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const mutation = useMutation(groupId);
   const household = schedule.households.find(
     (item) => item.id === schedule.currentHouseholdId,
@@ -691,7 +708,7 @@ function FamilySchedule({ groupId, schedule }: Props) {
               return (
                 <div className="family-event-row" key={event.id}>
                   <time dateTime={event.date}>
-                    {format(parseISO(event.date), "EEE, MMM d")}
+                    {displayDate(parseISO(event.date), "EEE, MMM d", locale)}
                   </time>
                   <strong>{t(eventTitle(event))}</strong>
                   <span>
@@ -847,7 +864,7 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
             <div>
               <h2>{t("Event schedule")}</h2>
               <p className="text-muted">
-                {t("Add one-time events or recurring weekly practices.")}
+                {t("Add one-time events or recurring weekly events.")}
               </p>
             </div>
           </div>
@@ -869,7 +886,7 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
               onClick={() => setPanel("recurring")}
             >
               <CalendarDays size={18} />
-              {t("Weekly practices")}
+              {t("Recurring weekly events")}
             </button>
             <button
               className="secondary-button"
@@ -982,7 +999,9 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
           <div>
             <h2>{t("Group breaks")}</h2>
             <p className="text-muted">
-              {t("Practices are hidden during a break; games remain visible.")}
+              {t(
+                "Regular events are paused during a break; special events remain visible.",
+              )}
             </p>
           </div>
           <button
@@ -1012,7 +1031,7 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
         {schedule.breaks.map((period) => (
           <div className="period-row" key={period.id}>
             <span>
-              <strong>{period.label || t("No practice")}</strong>
+              <strong>{period.label || t("Group break")}</strong>
               <small>
                 {period.startsOn} – {period.endsOn}
               </small>
@@ -1124,7 +1143,7 @@ function EventForm({
         >
           {eventTypes.map((type) => (
             <option key={type} value={type}>
-              {t(type)}
+              {t(eventTypeLabel(type))}
             </option>
           ))}
         </select>
@@ -1136,6 +1155,7 @@ function EventForm({
           maxLength={120}
           value={title}
           onChange={(input) => setTitle(input.target.value)}
+          placeholder={t("Weekly Scouts meeting")}
         />
       </label>
       <label>
@@ -1223,6 +1243,7 @@ function RecurringForm({
   );
   const [startTime, setStartTime] = useState("17:00");
   const [endTime, setEndTime] = useState("");
+  const [title, setTitle] = useState("");
   const [locationId, setLocationId] = useState(
     schedule.locations[0]?.id ?? "",
   );
@@ -1252,9 +1273,21 @@ function RecurringForm({
           locationId,
           needsTo,
           needsFrom,
+          title: title.trim() || null,
         });
       }}
     >
+      <label>
+        {t("Event name")}
+        <input
+          className="input"
+          required
+          maxLength={120}
+          value={title}
+          onChange={(input) => setTitle(input.target.value)}
+          placeholder={t("Weekly Scouts meeting")}
+        />
+      </label>
       <label>
         {t("Weekday")}
         <select
