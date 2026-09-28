@@ -27,26 +27,22 @@ export const minimumQueryLength = 3;
 // Photon is the autocomplete-oriented OpenStreetMap geocoder. It needs no API
 // key, and shares its data with the Nominatim lookup used for routes, so
 // suggestions and route geocoding agree.
-// Photon only localizes to de, en, and fr. Omitting `lang` returns each
-// place's native name, which is what Hebrew users want, so anything
-// unsupported is sent unlocalized rather than forced to English.
-const photonLanguages = new Set(["de", "en", "fr"]);
-
 export function photonSuggestUrl(
   query: string,
-  { language, bias }: { language?: string; bias?: string } = {},
+  { bias }: { bias?: string } = {},
 ) {
   const url = new URL("https://photon.komoot.io/api/");
   url.searchParams.set("q", query);
   url.searchParams.set("limit", "6");
-  if (language && photonLanguages.has(language)) {
-    url.searchParams.set("lang", language);
-  }
+  // Addresses are stored and displayed in English regardless of UI language.
+  url.searchParams.set("lang", "en");
   // Bias ranking toward the group's region without excluding other results.
   if (bias) url.searchParams.set("bbox", bias);
   return url.toString();
 }
 
+// US-style: "Zofim Hall, 3011 181st Ave NE, Bellevue, WA 98008". State and ZIP
+// matter for disambiguation; the country does not, since groups are local.
 export function formatSuggestionAddress(
   properties: NonNullable<PhotonFeature["properties"]>,
 ) {
@@ -55,12 +51,16 @@ export function formatSuggestionAddress(
     .join(" ");
   // `name` duplicates the street for road results, so only keep it when it
   // adds something (a venue or landmark).
-  const leading = properties.name && properties.name !== properties.street
-    ? properties.name
-    : "";
-  const locality = properties.city ?? properties.district ?? properties.state;
+  const leading =
+    properties.name && properties.name !== properties.street
+      ? properties.name
+      : "";
+  const city = properties.city ?? properties.district;
+  const region = [properties.state, properties.postcode]
+    .filter(Boolean)
+    .join(" ");
 
-  return [leading, street, locality, properties.country]
+  return [leading, street, city, region]
     .map((part) => part?.trim())
     .filter(Boolean)
     .join(", ");

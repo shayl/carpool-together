@@ -14,13 +14,11 @@ export async function GET(request: Request) {
 
     const params = new URL(request.url).searchParams;
     const query = (params.get("q") ?? "").trim();
-    const language = params.get("lang") ?? "";
     if (query.length < minimumQueryLength) {
       return Response.json({ suggestions: [] });
     }
 
     const upstream = photonSuggestUrl(query, {
-      language,
       bias: process.env.ADDRESS_SUGGEST_BBOX,
     });
 

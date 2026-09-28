@@ -5,50 +5,48 @@ import {
   photonSuggestUrl,
 } from "./address-suggestions";
 
-test("requests localized, bounded suggestions", () => {
+test("requests English, region-biased suggestions", () => {
   const url = new URL(
-    photonSuggestUrl("ben gurion", { language: "en", bias: "34.2,29.4,35.9,33.4" }),
+    photonSuggestUrl("181st ave", { bias: "-125.0,24.4,-66.9,49.4" }),
   );
   assert.equal(url.hostname, "photon.komoot.io");
-  assert.equal(url.searchParams.get("q"), "ben gurion");
+  assert.equal(url.searchParams.get("q"), "181st ave");
   assert.equal(url.searchParams.get("lang"), "en");
-  assert.equal(url.searchParams.get("bbox"), "34.2,29.4,35.9,33.4");
+  assert.equal(url.searchParams.get("bbox"), "-125.0,24.4,-66.9,49.4");
 });
 
-test("skips languages the geocoder rejects, keeping native names", () => {
-  // Photon 400s on lang=he; unlocalized results are already in Hebrew.
-  const url = new URL(photonSuggestUrl("בן גוריון", { language: "he" }));
-  assert.equal(url.searchParams.get("lang"), null);
-  assert.equal(url.searchParams.get("q"), "בן גוריון");
-});
-
-test("omits optional parameters when unset", () => {
+test("omits the region bias when unset", () => {
   const url = new URL(photonSuggestUrl("main st"));
-  assert.equal(url.searchParams.get("lang"), null);
+  assert.equal(url.searchParams.get("lang"), "en");
   assert.equal(url.searchParams.get("bbox"), null);
 });
 
-test("builds readable addresses with coordinates", () => {
+test("builds US-style addresses with coordinates", () => {
   const suggestions = normalizeSuggestions({
     features: [
       {
         properties: {
           osm_id: 1,
           osm_type: "W",
-          housenumber: "12",
-          street: "Ben Gurion",
-          city: "Givat Shmuel",
-          country: "Israel",
+          housenumber: "3011",
+          street: "181st Avenue Northeast",
+          city: "Bellevue",
+          state: "WA",
+          postcode: "98008",
+          country: "United States",
         },
-        geometry: { coordinates: [34.8455, 32.0756] },
+        geometry: { coordinates: [-122.1, 47.6] },
       },
     ],
   });
 
   assert.equal(suggestions.length, 1);
-  assert.equal(suggestions[0].address, "12 Ben Gurion, Givat Shmuel, Israel");
-  assert.equal(suggestions[0].latitude, 32.0756);
-  assert.equal(suggestions[0].longitude, 34.8455);
+  assert.equal(
+    suggestions[0].address,
+    "3011 181st Avenue Northeast, Bellevue, WA 98008",
+  );
+  assert.equal(suggestions[0].latitude, 47.6);
+  assert.equal(suggestions[0].longitude, -122.1);
 });
 
 test("keeps a venue name but never repeats the street", () => {
@@ -57,21 +55,28 @@ test("keeps a venue name but never repeats the street", () => {
       {
         properties: {
           osm_id: 2,
-          name: "Zofim Hall",
-          street: "Herzl",
-          city: "Tel Aviv",
+          name: "Crossroads Park",
+          street: "164th Ave NE",
+          city: "Bellevue",
+          state: "WA",
         },
-        geometry: { coordinates: [34.78, 32.08] },
+        geometry: { coordinates: [-122.13, 47.61] },
       },
       {
-        properties: { osm_id: 3, name: "Herzl", street: "Herzl", city: "Haifa" },
-        geometry: { coordinates: [34.99, 32.79] },
+        properties: {
+          osm_id: 3,
+          name: "Main Street",
+          street: "Main Street",
+          city: "Redmond",
+          state: "WA",
+        },
+        geometry: { coordinates: [-122.12, 47.67] },
       },
     ],
   });
 
-  assert.equal(venue.address, "Zofim Hall, Herzl, Tel Aviv");
-  assert.equal(road.address, "Herzl, Haifa");
+  assert.equal(venue.address, "Crossroads Park, 164th Ave NE, Bellevue, WA");
+  assert.equal(road.address, "Main Street, Redmond, WA");
 });
 
 test("drops duplicates and entries without usable coordinates", () => {

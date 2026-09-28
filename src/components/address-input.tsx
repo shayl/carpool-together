@@ -35,7 +35,7 @@ export function AddressInput({
   disabled?: boolean;
   maxLength?: number;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const listId = useId();
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -51,7 +51,7 @@ export function AddressInput({
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(
-          `/api/address-suggestions?q=${encodeURIComponent(query)}&lang=${locale}`,
+          `/api/address-suggestions?q=${encodeURIComponent(query)}`,
           { signal: controller.signal },
         );
         if (!response.ok) return;
@@ -70,7 +70,7 @@ export function AddressInput({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query, locale]);
+  }, [query]);
 
   function choose(suggestion: AddressSuggestion) {
     onChange({
@@ -133,29 +133,35 @@ export function AddressInput({
         />
       </label>
       {visible && (
-        <ul className="address-suggestions" id={listId} role="listbox">
-          {suggestions.map((suggestion, index) => (
-            <li key={suggestion.id} role="presentation">
-              <button
-                type="button"
-                role="option"
-                aria-selected={index === active}
-                className={
-                  index === active
-                    ? "address-suggestion address-suggestion-active"
-                    : "address-suggestion"
-                }
-                // onMouseDown so the pick lands before the input blurs.
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  choose(suggestion);
-                }}
-              >
-                {suggestion.address}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="address-suggestions">
+          <ul id={listId} role="listbox">
+            {suggestions.map((suggestion, index) => (
+              <li key={suggestion.id} role="presentation">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={index === active}
+                  className={
+                    index === active
+                      ? "address-suggestion address-suggestion-active"
+                      : "address-suggestion"
+                  }
+                  // onMouseDown so the pick lands before the input blurs.
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    choose(suggestion);
+                  }}
+                >
+                  {suggestion.address}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {/* ODbL requires crediting OpenStreetMap wherever its data is shown. */}
+          <p className="address-suggestions-credit">
+            © <span>OpenStreetMap</span> {t("contributors")}
+          </p>
+        </div>
       )}
       {value.latitude !== null && (
         <p className="auth-footnote">{t("Location confirmed on the map.")}</p>

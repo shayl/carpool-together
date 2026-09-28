@@ -195,6 +195,9 @@ export const hebrew: Record<string, string> = {
   "Add venue": "הוספת מקום",
   "Start typing an address": "התחילו להקליד כתובת",
   "Location confirmed on the map.": "המיקום אומת במפה.",
+  contributors: "תורמי",
+  "Address suggestions and map routing use OpenStreetMap data. Address text you type is sent to the OpenStreetMap-based geocoding service to return matching suggestions. Map data is © OpenStreetMap contributors, available under the Open Database License.":
+    "הצעות הכתובות וניתוב המפות מבוססים על נתוני OpenStreetMap. טקסט הכתובת שאתם מקלידים נשלח לשירות הגיאוקודינג המבוסס על OpenStreetMap כדי להחזיר הצעות מתאימות. נתוני המפה הם © תורמי OpenStreetMap, וזמינים תחת רישיון Open Database License.",
   Venues: "מקומות",
   "Places your events meet. Open one to see it on a map.":
     "המקומות שבהם מתקיימים האירועים. פתחו מקום כדי לראות אותו במפה.",
