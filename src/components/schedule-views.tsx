@@ -22,6 +22,7 @@ import {
   Pencil,
   Plus,
   Route,
+  Share2,
   Trash2,
   Users,
   X,
@@ -40,6 +41,7 @@ import {
   requiredLegs,
   rideState,
 } from "@/lib/schedule-state";
+import { AddressInput, type AddressValue } from "@/components/address-input";
 import { MemberAvatar } from "@/components/member-avatar";
 import {
   coverageMood,
@@ -47,6 +49,10 @@ import {
 } from "@/components/ride-status-car";
 import {
   googleRouteUrl,
+  navigationProviderKey,
+  navigationTarget,
+  placeUrl,
+  savedNavigationProvider,
   singleStopUrl,
   type NavigationProvider,
 } from "@/lib/navigation-links";
@@ -684,14 +690,6 @@ function RouteLauncher({
   >(null);
   const [nextStopIndex, setNextStopIndex] = useState(1);
 
-  function navigationTarget() {
-    const mobile =
-      window.matchMedia("(pointer: coarse)").matches ||
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    return mobile ? "_self" : "_blank";
-  }
-
   async function loadRoute() {
     const response = await fetch(`/api/groups/${groupId}/routes`, {
       method: "POST",
@@ -716,9 +714,7 @@ function RouteLauncher({
     setError("");
     try {
       if (!navigator.onLine) throw new Error(t("Reconnect to open a route."));
-      const preference = window.localStorage.getItem(
-        "carpool-navigation-provider",
-      );
+      const preference = window.localStorage.getItem(navigationProviderKey);
       const saved =
         preference === "google" ||
         preference === "apple" ||
@@ -746,7 +742,7 @@ function RouteLauncher({
   }
 
   function launchProvider(provider: NavigationProvider, stops: GeoStop[]) {
-    window.localStorage.setItem("carpool-navigation-provider", provider);
+    window.localStorage.setItem(navigationProviderKey, provider);
     setChoosing(false);
     if (provider === "google") {
       window.open(googleRouteUrl(stops), navigationTarget(), "noopener,noreferrer");
@@ -1054,14 +1050,25 @@ function FamilySchedule({ groupId, schedule }: Props) {
   const [selected, setSelected] = useState<string[]>(
     participants.map((item) => item.id),
   );
-  const [addressDraft, setAddressDraft] = useState({
+  const [addressDraft, setAddressDraft] = useState<{
+    householdId: string | null;
+    value: AddressValue;
+  }>({
     householdId: household?.id ?? null,
-    value: household?.address ?? "",
+    value: {
+      address: household?.address ?? "",
+      latitude: household?.latitude ?? null,
+      longitude: household?.longitude ?? null,
+    },
   });
   const address =
     addressDraft.householdId === household?.id
       ? addressDraft.value
-      : (household?.address ?? "");
+      : {
+          address: household?.address ?? "",
+          latitude: household?.latitude ?? null,
+          longitude: household?.longitude ?? null,
+        };
   const futureEvents = schedule.events
     .filter(
       (event) =>
@@ -1095,35 +1102,30 @@ function FamilySchedule({ groupId, schedule }: Props) {
               await mutation.mutate(
                 "households",
                 "PATCH",
-                { address, latitude: null, longitude: null },
+                {
+                  address: address.address,
+                  latitude: address.latitude,
+                  longitude: address.longitude,
+                },
                 "save-address",
               );
             }}
           >
-            <label>
-              {t("Address")}
-              <input
-                className="input"
-                type="text"
-                autoComplete="street-address"
-                maxLength={300}
-                required
-                value={address}
-                onChange={(input) =>
-                  setAddressDraft({
-                    householdId: household.id,
-                    value: input.target.value,
-                  })
-                }
-                placeholder={t("123 Main St, City")}
-              />
-            </label>
+            <AddressInput
+              label={t("Address")}
+              required
+              value={address}
+              onChange={(next) =>
+                setAddressDraft({ householdId: household.id, value: next })
+              }
+              placeholder={t("123 Main St, City")}
+            />
             <button
               className="primary-button"
               disabled={
                 mutation.busyKey === "save-address" ||
-                !address.trim() ||
-                address.trim() === household.address
+                !address.address.trim() ||
+                address.address.trim() === household.address
               }
             >
               {mutation.busyKey === "save-address"
@@ -1297,7 +1299,30 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
     "event" | "recurring" | "venue" | "break" | null
   >(null);
   const [editingEvent, setEditingEvent] = useState<GroupEvent | null>(null);
+  const [shareLink, setShareLink] = useState("");
+  const [importToken, setImportToken] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : (new URLSearchParams(window.location.search).get("venue") ?? ""),
+  );
   const counts = driveCounts(schedule);
+
+  async function shareVenue(locationId: string) {
+    setShareLink("");
+    const response = await fetch(`/api/groups/${groupId}/venue-shares`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locationId }),
+    });
+    const result = (await response.json().catch(() => null)) as {
+      token?: string;
+    } | null;
+    if (!response.ok || !result?.token) return false;
+    const link = `${window.location.origin}/?venue=${result.token}`;
+    await navigator.clipboard?.writeText(link).catch(() => undefined);
+    setShareLink(link);
+    return true;
+  }
 
   return (
     <>
@@ -1444,6 +1469,88 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
       <section className="surface-card">
         <div className="card-heading">
           <div>
+            <h2>{t("Venues")}</h2>
+            <p className="text-muted">
+              {t("Places your events meet. Open one to see it on a map.")}
+            </p>
+          </div>
+          <MapPin size={22} />
+        </div>
+        {schedule.locations.length === 0 ? (
+          <p className="text-muted">{t("No venues yet.")}</p>
+        ) : (
+          <div className="household-address-list">
+            {schedule.locations.map((location) => (
+              <VenueRow
+                key={location.id}
+                location={location}
+                canManage={canManage}
+                busy={Boolean(mutation.busyKey)}
+                onShare={() => shareVenue(location.id)}
+                onSave={(name, next) =>
+                  mutation.mutate(
+                    "locations",
+                    "PATCH",
+                    { locationId: location.id, name, ...next },
+                    `venue-${location.id}`,
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+        {shareLink && (
+          <p className="auth-message share-link">
+            {t("Share link copied.")} <code>{shareLink}</code>
+          </p>
+        )}
+        {canManage && (
+          <form
+            className="schedule-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              // Accept a full link or a bare token.
+              const token = importToken.trim().split("venue=").at(-1)?.trim();
+              const saved = await mutation.mutate(
+                "venue-shares",
+                "PUT",
+                { token },
+                "import-venue",
+              );
+              if (saved) setImportToken("");
+            }}
+          >
+            <label>
+              {t("Add a venue shared with you")}
+              <input
+                className="input"
+                value={importToken}
+                onChange={(input) => setImportToken(input.target.value)}
+                placeholder={t("Paste a venue share link")}
+              />
+            </label>
+            <button
+              className="secondary-button"
+              disabled={
+                mutation.busyKey === "import-venue" || !importToken.trim()
+              }
+            >
+              {mutation.busyKey === "import-venue"
+                ? t("Adding…")
+                : t("Add shared venue")}
+            </button>
+            <p className="auth-footnote">
+              {t(
+                "You get your own copy to edit. Adding the same link again restores the original details.",
+              )}
+            </p>
+          </form>
+        )}
+      </section>
+
+      <section className="surface-card">
+        <div className="card-heading">
+          <div>
             <h2>{t("Group breaks")}</h2>
             <p className="text-muted">
               {t(
@@ -1518,16 +1625,11 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
               household={household}
               canManage={canManage}
               busy={Boolean(mutation.busyKey)}
-              onSave={(address) =>
+              onSave={(next) =>
                 mutation.mutate(
                   "households",
                   "PATCH",
-                  {
-                    householdId: household.id,
-                    address,
-                    latitude: null,
-                    longitude: null,
-                  },
+                  { householdId: household.id, ...next },
                   `household-${household.id}`,
                 )
               }
@@ -1559,6 +1661,131 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
   );
 }
 
+function VenueRow({
+  location,
+  canManage,
+  busy,
+  onShare,
+  onSave,
+}: {
+  location: GroupSchedule["locations"][number];
+  canManage: boolean;
+  busy: boolean;
+  onShare: () => Promise<boolean>;
+  onSave: (name: string, location: AddressValue) => Promise<boolean>;
+}) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [name, setName] = useState(location.name);
+  const [draft, setDraft] = useState<AddressValue>({
+    address: location.address,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  });
+
+  function openInMaps() {
+    const provider = savedNavigationProvider(
+      window.localStorage.getItem(navigationProviderKey),
+    );
+    window.open(
+      placeUrl(provider, {
+        label: location.name,
+        address: location.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      }),
+      navigationTarget(),
+      "noopener,noreferrer",
+    );
+  }
+
+  if (editing) {
+    return (
+      <form
+        className="household-address-editor"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (await onSave(name, draft)) setEditing(false);
+        }}
+      >
+        <input
+          className="input"
+          required
+          maxLength={160}
+          value={name}
+          aria-label={t("Venue name")}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <AddressInput
+          required
+          value={draft}
+          onChange={setDraft}
+          ariaLabel={t("Address for {{name}}", { name: location.name })}
+        />
+        <button className="primary-button" disabled={busy}>
+          {t("Save")}
+        </button>
+        <button
+          className="text-button"
+          type="button"
+          onClick={() => {
+            setName(location.name);
+            setDraft({
+              address: location.address,
+              latitude: location.latitude,
+              longitude: location.longitude,
+            });
+            setEditing(false);
+          }}
+        >
+          {t("Cancel")}
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="household-address-row">
+      <div>
+        <strong>{location.name}</strong>
+        <address>{location.address}</address>
+      </div>
+      <span className="row-actions">
+        <button className="text-button" type="button" onClick={openInMaps}>
+          <MapPin size={16} />
+          {t("Open in maps")}
+        </button>
+        {canManage && (
+          <>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil size={16} />
+              {t("Edit")}
+            </button>
+            <button
+              className="text-button"
+              type="button"
+              disabled={sharing}
+              onClick={async () => {
+                setSharing(true);
+                await onShare();
+                setSharing(false);
+              }}
+            >
+              <Share2 size={16} />
+              {sharing ? t("Sharing…") : t("Share")}
+            </button>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
 function HouseholdAddressRow({
   household,
   canManage,
@@ -1568,11 +1795,15 @@ function HouseholdAddressRow({
   household: GroupSchedule["households"][number];
   canManage: boolean;
   busy: boolean;
-  onSave: (address: string) => Promise<boolean>;
+  onSave: (location: AddressValue) => Promise<boolean>;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
-  const [address, setAddress] = useState(household.address);
+  const [draft, setDraft] = useState<AddressValue>({
+    address: household.address,
+    latitude: household.latitude,
+    longitude: household.longitude,
+  });
 
   return (
     <div className="household-address-row">
@@ -1586,18 +1817,16 @@ function HouseholdAddressRow({
             className="household-address-editor"
             onSubmit={async (event) => {
               event.preventDefault();
-              if (await onSave(address)) setEditing(false);
+              if (await onSave(draft)) setEditing(false);
             }}
           >
-            <input
-              className="input"
+            <AddressInput
               required
-              maxLength={300}
-              value={address}
-              aria-label={t("Address for {{name}}", {
+              value={draft}
+              onChange={setDraft}
+              ariaLabel={t("Address for {{name}}", {
                 name: household.name,
               })}
-              onChange={(event) => setAddress(event.target.value)}
             />
             <button className="primary-button" disabled={busy}>
               {t("Save")}
@@ -1606,7 +1835,11 @@ function HouseholdAddressRow({
               className="text-button"
               type="button"
               onClick={() => {
-                setAddress(household.address);
+                setDraft({
+                  address: household.address,
+                  latitude: household.latitude,
+                  longitude: household.longitude,
+                });
                 setEditing(false);
               }}
             >
@@ -1937,13 +2170,17 @@ function VenueForm({
 }) {
   const { t } = useI18n();
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const [location, setLocation] = useState<AddressValue>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
   return (
     <form
       className="schedule-form"
       onSubmit={(event) => {
         event.preventDefault();
-        onSave({ name, address, latitude: null, longitude: null });
+        onSave({ name, ...location });
       }}
     >
       <label>
@@ -1955,16 +2192,13 @@ function VenueForm({
           onChange={(input) => setName(input.target.value)}
         />
       </label>
-      <label>
-        {t("Address")}
-        <input
-          className="input"
-          required
-          minLength={5}
-          value={address}
-          onChange={(input) => setAddress(input.target.value)}
-        />
-      </label>
+      <AddressInput
+        label={t("Address")}
+        required
+        value={location}
+        onChange={setLocation}
+        placeholder={t("Start typing an address")}
+      />
       <FormActions busy={busy} onCancel={onCancel} />
     </form>
   );

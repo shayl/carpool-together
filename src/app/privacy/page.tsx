@@ -39,6 +39,11 @@ export default function PrivacyPage() {
         </p>
         <p>
           {t(
+            "Address suggestions and map routing use OpenStreetMap data. Address text you type is sent to the OpenStreetMap-based geocoding service to return matching suggestions. Map data is © OpenStreetMap contributors, available under the Open Database License.",
+          )}
+        </p>
+        <p>
+          {t(
             "This initial notice must be reviewed and updated for the deployed service's operator, jurisdiction, retention practices, and contact details before a broad public launch.",
           )}
         </p>

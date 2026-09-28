@@ -6,7 +6,8 @@ export type GroupScheduleResource =
   | "events"
   | "households"
   | "locations"
-  | "templates";
+  | "templates"
+  | "venue-shares";
 
 export function groupResourceUrl(
   groupId: string,
