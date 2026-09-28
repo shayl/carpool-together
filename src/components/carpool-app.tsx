@@ -5,7 +5,9 @@ import {
   CalendarDays,
   BookOpen,
   Car,
+  Check,
   ChevronDown,
+  Copy,
   Heart,
   ImagePlus,
   Info,
@@ -16,7 +18,7 @@ import {
   Upload,
   Users,
 } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppVersion } from "@/components/app-version";
 import { GeneratedGroupPin } from "@/components/generated-group-pin";
@@ -1164,53 +1166,74 @@ function GroupInvitation({
   groupName: string;
 }) {
   const { t } = useI18n();
+  const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  async function share() {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    const whatsappWindow = window.open("", "_blank");
-    try {
+  useEffect(() => {
+    let active = true;
+    async function loadPin() {
+      setLoading(true);
+      setError("");
       const response = await fetch(`/api/groups/${groupId}/pin`);
       const result = (await response.json().catch(() => null)) as {
         error?: string;
         pin?: string;
       } | null;
       if (!response.ok || !result?.pin) {
-        throw new Error(
-          result?.error ?? t("Could not load the group PIN."),
-        );
+        if (active) {
+          setError(t(result?.error ?? "Could not load the group PIN."));
+        }
+      } else if (active) {
+        setPin(result.pin);
       }
-      const text = t(
+      if (active) setLoading(false);
+    }
+    void loadPin();
+    return () => {
+      active = false;
+    };
+  }, [groupId, t]);
+
+  const invitation = pin
+    ? t(
         "Join {{group}} on Carpool Together!\n\nOpen the app: {{url}}\nGroup PIN: {{pin}}",
         {
           group: groupName,
           url: window.location.origin,
-          pin: result.pin,
+          pin,
         },
-      );
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-      if (whatsappWindow) {
-        whatsappWindow.opener = null;
-        whatsappWindow.location.href = whatsappUrl;
-      } else {
-        window.location.href = whatsappUrl;
-      }
-      setMessage(
-        t("WhatsApp opened. Choose your group chat to send the invitation."),
-      );
-    } catch (caught) {
-      whatsappWindow?.close();
-      setError(
-        caught instanceof Error
-          ? t(caught.message)
-          : t("Could not load the group PIN."),
-      );
-    } finally {
-      setLoading(false);
+      )
+    : "";
+
+  function shareOnWhatsApp() {
+    setMessage("");
+    setCopied(false);
+    if (!invitation) return;
+    const mobile =
+      window.matchMedia("(pointer: coarse)").matches ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(invitation)}`,
+      mobile ? "_self" : "_blank",
+      "noopener,noreferrer",
+    );
+  }
+
+  async function copyInvitation() {
+    setError("");
+    setMessage("");
+    setCopied(false);
+    if (!invitation) return;
+    try {
+      await navigator.clipboard.writeText(invitation);
+      setCopied(true);
+      setMessage(t("Invitation copied."));
+    } catch {
+      setError(t("Could not copy the invitation. Select WhatsApp instead."));
     }
   }
 
@@ -1245,15 +1268,26 @@ function GroupInvitation({
               {message}
             </p>
           )}
-          <button
-            className="primary-button"
-            type="button"
-            disabled={loading}
-            onClick={() => void share()}
-          >
-            <Share2 size={18} aria-hidden="true" />
-            {loading ? t("Preparing invitation…") : t("Share on WhatsApp")}
-          </button>
+          <div className="confirmation-actions">
+            <button
+              className="primary-button"
+              type="button"
+              disabled={loading || !pin}
+              onClick={shareOnWhatsApp}
+            >
+              <Share2 size={18} aria-hidden="true" />
+              {loading ? t("Preparing invitation…") : t("Share on WhatsApp")}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={loading || !pin}
+              onClick={() => void copyInvitation()}
+            >
+              {copied ? <Check size={18} /> : <Copy size={18} />}
+              {copied ? t("Invitation copied") : t("Copy invitation")}
+            </button>
+          </div>
         </div>
       </section>
     </>

@@ -21,6 +21,11 @@ export const hebrew: Record<string, string> = {
   "The current group PIN is added securely when you share.":
     "קוד ה-PIN הנוכחי של הקבוצה נוסף באופן מאובטח בעת השיתוף.",
   "Preparing invitation…": "מכינים הזמנה…",
+  "Copy invitation": "העתקת ההזמנה",
+  "Invitation copied": "ההזמנה הועתקה",
+  "Invitation copied.": "ההזמנה הועתקה.",
+  "Could not copy the invitation. Select WhatsApp instead.":
+    "לא ניתן להעתיק את ההזמנה. בחרו במקום זאת ב-WhatsApp.",
   "Share on WhatsApp": "שיתוף ב-WhatsApp",
   "WhatsApp opened. Choose your group chat to send the invitation.":
     "WhatsApp נפתח. בחרו את הצ'אט הקבוצתי שאליו תרצו לשלוח את ההזמנה.",
