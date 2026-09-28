@@ -989,7 +989,12 @@ function SettingsHome(props: SettingsHomeProps) {
       <h2 className="settings-section-title">{t("App and notifications")}</h2>
       <InstallAppCard />
       <PushReminderSettings />
-      <GroupInvitation groupName={props.group.name} />
+      {props.group.role === "owner" && (
+        <GroupInvitation
+          groupId={props.group.id}
+          groupName={props.group.name}
+        />
+      )}
       <h2 className="settings-section-title">{t("Help and information")}</h2>
       <section className="settings-link-card">
         <button type="button" onClick={props.onHelp}>
@@ -1151,37 +1156,62 @@ function SettingsHome(props: SettingsHomeProps) {
   );
 }
 
-function GroupInvitation({ groupName }: { groupName: string }) {
+function GroupInvitation({
+  groupId,
+  groupName,
+}: {
+  groupId: string;
+  groupName: string;
+}) {
   const { t } = useI18n();
-  const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function share() {
+  async function share() {
     setError("");
     setMessage("");
-    if (!/^\d{6}$/.test(pin)) {
-      setError(t("Enter the current 6-digit group PIN."));
-      return;
+    setLoading(true);
+    const whatsappWindow = window.open("", "_blank");
+    try {
+      const response = await fetch(`/api/groups/${groupId}/pin`);
+      const result = (await response.json().catch(() => null)) as {
+        error?: string;
+        pin?: string;
+      } | null;
+      if (!response.ok || !result?.pin) {
+        throw new Error(
+          result?.error ?? t("Could not load the group PIN."),
+        );
+      }
+      const text = t(
+        "Join {{group}} on Carpool Together!\n\nOpen the app: {{url}}\nGroup PIN: {{pin}}",
+        {
+          group: groupName,
+          url: window.location.origin,
+          pin: result.pin,
+        },
+      );
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      if (whatsappWindow) {
+        whatsappWindow.opener = null;
+        whatsappWindow.location.href = whatsappUrl;
+      } else {
+        window.location.href = whatsappUrl;
+      }
+      setMessage(
+        t("WhatsApp opened. Choose your group chat to send the invitation."),
+      );
+    } catch (caught) {
+      whatsappWindow?.close();
+      setError(
+        caught instanceof Error
+          ? t(caught.message)
+          : t("Could not load the group PIN."),
+      );
+    } finally {
+      setLoading(false);
     }
-
-    const text = t(
-      "Join {{group}} on Carpool Together!\n\nOpen the app: {{url}}\nGroup PIN: {{pin}}",
-      {
-        group: groupName,
-        url: window.location.origin,
-        pin,
-      },
-    );
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(text)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-    setMessage(
-      t("WhatsApp opened. Choose your group chat to send the invitation."),
-    );
-    setPin("");
   }
 
   return (
@@ -1199,30 +1229,11 @@ function GroupInvitation({ groupName }: { groupName: string }) {
             "Send this group's app link and current PIN to your WhatsApp group.",
           )}
         </p>
-        <form
+        <div
           className="schedule-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            share();
-          }}
         >
-          <label>
-            {t("Current group PIN")}
-            <input
-              className="input"
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              pattern="[0-9]{6}"
-              minLength={6}
-              maxLength={6}
-              required
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-            />
-          </label>
           <p className="text-muted">
-            {t("For privacy, enter the PIN each time you share.")}
+            {t("The current group PIN is added securely when you share.")}
           </p>
           {error && (
             <p className="auth-error" role="alert">
@@ -1234,11 +1245,16 @@ function GroupInvitation({ groupName }: { groupName: string }) {
               {message}
             </p>
           )}
-          <button className="primary-button" type="submit">
+          <button
+            className="primary-button"
+            type="button"
+            disabled={loading}
+            onClick={() => void share()}
+          >
             <Share2 size={18} aria-hidden="true" />
-            {t("Share on WhatsApp")}
+            {loading ? t("Preparing invitation…") : t("Share on WhatsApp")}
           </button>
-        </form>
+        </div>
       </section>
     </>
   );
