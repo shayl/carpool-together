@@ -59,6 +59,8 @@ export function CarpoolApp({
     "admin" | "coordinator" | "member"
   >("member");
   const [csv, setCsv] = useState("");
+  const [mergeMember, setMergeMember] = useState("");
+  const [intoMember, setIntoMember] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [existingGroupPhone, setExistingGroupPhone] = useState("");
   const [existingGroupPin, setExistingGroupPin] = useState("");
@@ -167,6 +169,55 @@ export function CarpoolApp({
         caught instanceof Error
           ? caught.message
           : t("Could not add the person."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function mergeHouseholds(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!mergeMember || !intoMember || mergeMember === intoMember) {
+      setError(t("Choose two different members to combine."));
+      return;
+    }
+    if (
+      !window.confirm(
+        t(
+          "Combine these members into one household? They will share rides and driving responsibility.",
+        ),
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/groups/${group.id}/households/merge`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mergeRosterEntryId: mergeMember,
+            intoRosterEntryId: intoMember,
+          }),
+        },
+      );
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          result.error ? t(result.error) : t("Could not combine households."),
+        );
+      }
+      setMergeMember("");
+      setIntoMember("");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : t("Could not combine households."),
       );
     } finally {
       setLoading(false);
@@ -460,6 +511,7 @@ export function CarpoolApp({
             canManage={group.canManageRoster}
             view={destination}
             schedule={group.schedule}
+            roster={group.roster}
           />
         )}
 
@@ -531,6 +583,59 @@ export function CarpoolApp({
                   <small>{t(member.role)}</small>
                 </div>
               ))}
+              {group.canManageRoster && (
+                <form
+                  className="schedule-form"
+                  onSubmit={mergeHouseholds}
+                >
+                  <h2>{t("Combine households")}</h2>
+                  <p className="text-muted">
+                    {t(
+                      "Put two members in one household so they share the same riders and rides.",
+                    )}
+                  </p>
+                  <label>
+                    {t("Member")}
+                    <select
+                      className="input"
+                      required
+                      value={mergeMember}
+                      onChange={(event) => setMergeMember(event.target.value)}
+                    >
+                      <option value="">{t("Choose member")}</option>
+                      {group.roster.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t("Into household of")}
+                    <select
+                      className="input"
+                      required
+                      value={intoMember}
+                      onChange={(event) => setIntoMember(event.target.value)}
+                    >
+                      <option value="">{t("Choose member")}</option>
+                      {group.roster.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="primary-button"
+                    disabled={
+                      loading || !mergeMember || !intoMember || mergeMember === intoMember
+                    }
+                  >
+                    {loading ? t("Saving…") : t("Combine")}
+                  </button>
+                </form>
+              )}
             </section>
             {group.canManageRoster && (
               <>

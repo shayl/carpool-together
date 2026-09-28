@@ -142,7 +142,11 @@ export async function loadGroupSchedules(
       participants: byGroup(
         participantsResult.data,
         membership.group_id,
-      ).map(
+      )
+        // Rows linked to a roster entry are the adults themselves (a legacy
+        // of the pre-household schema). They drive; they never need rides.
+        .filter((row) => !row.roster_entry_id)
+        .map(
         (row): GroupParticipant => {
           const rosterEntry = (rosterResult.data ?? []).find(
             (entry) =>
