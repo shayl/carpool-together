@@ -5,7 +5,9 @@ export type GroupHousehold = {
   id: string;
   groupId: string;
   rosterEntryId: string | null;
+  /** Every active adult in the household, joined for display. */
   name: string;
+  memberNames: string[];
   address: string;
   latitude: number | null;
   longitude: number | null;
@@ -58,6 +60,7 @@ export type RideClaim = {
   eventId: string;
   leg: RideLeg;
   householdId: string;
+  driverRosterEntryId: string | null;
   claimedBy: string;
 };
 

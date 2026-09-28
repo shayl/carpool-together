@@ -64,6 +64,7 @@ import type {
   RideLeg,
 } from "@/lib/schedule-types";
 import { useI18n } from "@/lib/i18n";
+import type { AppRosterEntry } from "@/lib/app-data";
 
 type ScheduleView = "rides" | "family" | "team";
 
@@ -73,6 +74,7 @@ type Props = {
   canManage: boolean;
   view: ScheduleView;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
 };
 
 const eventTypes: EventType[] = ["practice", "game", "competition"];
@@ -154,7 +156,7 @@ function useMutation(groupId: string) {
   return { busyKey, error, message, mutate };
 }
 
-function RidesSchedule({ groupId, groupName, schedule }: Props) {
+function RidesSchedule({ groupId, groupName, schedule, roster }: Props) {
   const { t, locale } = useI18n();
   const mutation = useMutation(groupId);
   const [display, setDisplay] = useState<"week" | "month">("week");
@@ -353,6 +355,7 @@ function RidesSchedule({ groupId, groupName, schedule }: Props) {
               key={event.id}
               event={event}
               schedule={schedule}
+              roster={roster}
               expanded={expanded === event.id}
               onToggle={() =>
                 setExpanded((current) => (current === event.id ? null : event.id))
@@ -439,12 +442,14 @@ function MonthGrid({
 function EventCard({
   event,
   schedule,
+  roster,
   expanded,
   onToggle,
   mutation,
 }: {
   event: GroupEvent;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
   expanded: boolean;
   onToggle: () => void;
   mutation: ReturnType<typeof useMutation>;
@@ -538,6 +543,7 @@ function EventCard({
               event={event}
               leg={leg}
               schedule={schedule}
+              roster={roster}
               mutation={mutation}
             />
           ))}
@@ -560,17 +566,29 @@ function RideLegPanel({
   event,
   leg,
   schedule,
+  roster,
   mutation,
 }: {
   event: GroupEvent;
   leg: RideLeg;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
   mutation: ReturnType<typeof useMutation>;
 }) {
   const { t } = useI18n();
   const ride = rideState(schedule, event, leg);
-  const [householdId, setHouseholdId] = useState(
-    schedule.currentHouseholdId ?? schedule.households[0]?.id ?? "",
+  // Drivers are people, not households: every adult attached to a household
+  // can take a ride, and picking one implies their household.
+  const drivers = roster.filter(
+    (member) => member.active && member.householdId,
+  );
+  const [driverId, setDriverId] = useState(
+    () =>
+      drivers.find(
+        (member) => member.householdId === schedule.currentHouseholdId,
+      )?.id ??
+      drivers[0]?.id ??
+      "",
   );
   if (!ride.active) return null;
   const riderHouseholds = [
@@ -597,7 +615,11 @@ function RideLegPanel({
       {ride.claim ? (
         <div className="claim-row">
           <strong>
-            {ride.household?.name ?? t("Assigned family")}
+            {roster.find(
+              (member) => member.id === ride.claim?.driverRosterEntryId,
+            )?.displayName ??
+              ride.household?.name ??
+              t("Assigned family")}
           </strong>
           <button
             className="secondary-button"
@@ -619,25 +641,25 @@ function RideLegPanel({
         <div className="claim-row">
           <select
             className="input"
-            aria-label={t("Driving family")}
-            value={householdId}
-            onChange={(item) => setHouseholdId(item.target.value)}
+            aria-label={t("Driver")}
+            value={driverId}
+            onChange={(item) => setDriverId(item.target.value)}
           >
-            {schedule.households.map((household) => (
-              <option key={household.id} value={household.id}>
-                {household.name}
+            {drivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>
+                {driver.displayName}
               </option>
             ))}
           </select>
           <button
             className="primary-button"
             type="button"
-            disabled={!householdId || Boolean(mutation.busyKey)}
+            disabled={!driverId || Boolean(mutation.busyKey)}
             onClick={() =>
               mutation.mutate(
                 "claims",
                 "POST",
-                { eventId: event.id, leg, householdId },
+                { eventId: event.id, leg, driverRosterEntryId: driverId },
                 `claim-${event.id}-${leg}`,
               )
             }
@@ -652,7 +674,14 @@ function RideLegPanel({
       <div className="ride-address-list">
         {ride.household && (
           <address>
-            <strong>{t("Driver: {{name}}", { name: ride.household.name })}</strong>
+            <strong>
+              {t("Driver: {{name}}", {
+                name:
+                  roster.find(
+                    (member) => member.id === ride.claim?.driverRosterEntryId,
+                  )?.displayName ?? ride.household.name,
+              })}
+            </strong>
             <span>{ride.household.address || t("No address added")}</span>
           </address>
         )}
@@ -1035,7 +1064,7 @@ function ParticipantStatusEditor({
   );
 }
 
-function FamilySchedule({ groupId, schedule }: Props) {
+function FamilySchedule({ groupId, schedule, roster }: Props) {
   const { t, locale } = useI18n();
   const mutation = useMutation(groupId);
   const household = schedule.households.find(
@@ -1044,6 +1073,10 @@ function FamilySchedule({ groupId, schedule }: Props) {
   const participants = schedule.participants.filter(
     (item) => item.householdId === household?.id,
   );
+  const drivers = roster.filter(
+    (member) => member.active && member.householdId === household?.id,
+  );
+  const [riderName, setRiderName] = useState("");
   const [showAbsence, setShowAbsence] = useState(false);
   const [startsOn, setStartsOn] = useState(format(new Date(), "yyyy-MM-dd"));
   const [endsOn, setEndsOn] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -1133,6 +1166,108 @@ function FamilySchedule({ groupId, schedule }: Props) {
                 : t("Save address")}
             </button>
           </form>
+        </section>
+      )}
+      {household && drivers.length > 0 && (
+        <section className="surface-card">
+          <div className="card-heading">
+            <div>
+              <h2>{t("Drivers in this household")}</h2>
+              <p className="text-muted">
+                {t(
+                  "Every driver here can claim and drive this household's rides.",
+                )}
+              </p>
+            </div>
+          </div>
+          {drivers.map((driver) => (
+            <div className="period-row" key={driver.id}>
+              <span>
+                <strong>{driver.displayName}</strong>
+              </span>
+              <small>{t(driver.role)}</small>
+            </div>
+          ))}
+        </section>
+      )}
+      {household && (
+        <section className="surface-card">
+          <div className="card-heading">
+            <div>
+              <h2>{t("Riders in this household")}</h2>
+              <p className="text-muted">
+                {t(
+                  "The kids who need rides. Every parent in the household shares driving responsibility.",
+                )}
+              </p>
+            </div>
+          </div>
+          <form
+            className="schedule-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const saved = await mutation.mutate(
+                "participants",
+                "POST",
+                { name: riderName },
+                "add-rider",
+              );
+              if (saved) setRiderName("");
+            }}
+          >
+            <label>
+              {t("Add a rider")}
+              <input
+                className="input"
+                required
+                maxLength={100}
+                value={riderName}
+                onChange={(input) => setRiderName(input.target.value)}
+                placeholder={t("Rider name")}
+              />
+            </label>
+            <button
+              className="primary-button"
+              disabled={mutation.busyKey === "add-rider" || !riderName.trim()}
+            >
+              {mutation.busyKey === "add-rider"
+                ? t("Adding…")
+                : t("Add rider")}
+            </button>
+          </form>
+          {participants.length > 0 &&
+            participants.map((participant) => (
+              <div className="period-row" key={participant.id}>
+                <span>
+                  <strong>{participant.name}</strong>
+                </span>
+                <span className="row-actions">
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={mutation.busyKey === `rider-${participant.id}`}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          t("Remove {{name}} from this household?", {
+                            name: participant.name,
+                          }),
+                        )
+                      ) {
+                        void mutation.mutate(
+                          "participants",
+                          "DELETE",
+                          { participantId: participant.id },
+                          `rider-${participant.id}`,
+                        );
+                      }
+                    }}
+                  >
+                    {t("Remove")}
+                  </button>
+                </span>
+              </div>
+            ))}
         </section>
       )}
       <section className="surface-card">

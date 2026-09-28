@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AppRosterEntry = {
   id: string;
+  householdId: string | null;
   displayName: string;
   phone?: string;
   photoUrl?: string;
@@ -61,7 +62,7 @@ export async function loadAppData(userId: string) {
         .in("id", groupIds),
       admin
         .from("group_access_roster")
-        .select("id, group_id, display_name, phone, photo_path, role, active")
+        .select("id, group_id, household_id, display_name, phone, photo_path, role, active")
         .in("group_id", groupIds)
         .order("display_name"),
       loadGroupSchedules(groupIds, userId),
@@ -111,6 +112,7 @@ export async function loadAppData(userId: string) {
         },
         roster: groupRoster.map((entry) => ({
             id: entry.id,
+            householdId: entry.household_id,
             displayName: entry.display_name,
             ...(canManageRoster ? { phone: entry.phone } : {}),
             ...(entry.photo_path
