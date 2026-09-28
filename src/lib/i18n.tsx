@@ -193,6 +193,8 @@ export const hebrew: Record<string, string> = {
   "Add one-time events or recurring weekly events.":
     "הוסיפו אירועים חד-פעמיים או אירועים שבועיים קבועים.",
   "Add venue": "הוספת מקום",
+  "Start typing an address": "התחילו להקליד כתובת",
+  "Location confirmed on the map.": "המיקום אומת במפה.",
   Venues: "מקומות",
   "Places your events meet. Open one to see it on a map.":
     "המקומות שבהם מתקיימים האירועים. פתחו מקום כדי לראות אותו במפה.",

@@ -1168,6 +1168,51 @@ button:disabled {
   flex: 1 1 240px;
 }
 
+.address-input {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+/* The address needs the full row: truncating it to a narrow box hides the
+   part of the address that distinguishes one suggestion from another. */
+.household-address-editor .address-input {
+  flex: 1 1 100%;
+}
+
+.address-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  inset-inline: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 12%);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.address-suggestion {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: start;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.address-suggestion:hover,
+.address-suggestion-active {
+  background: rgb(15 23 42 / 6%);
+}
+
 .schedule-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -41,6 +41,7 @@ import {
   requiredLegs,
   rideState,
 } from "@/lib/schedule-state";
+import { AddressInput, type AddressValue } from "@/components/address-input";
 import { MemberAvatar } from "@/components/member-avatar";
 import {
   coverageMood,
@@ -1049,14 +1050,25 @@ function FamilySchedule({ groupId, schedule }: Props) {
   const [selected, setSelected] = useState<string[]>(
     participants.map((item) => item.id),
   );
-  const [addressDraft, setAddressDraft] = useState({
+  const [addressDraft, setAddressDraft] = useState<{
+    householdId: string | null;
+    value: AddressValue;
+  }>({
     householdId: household?.id ?? null,
-    value: household?.address ?? "",
+    value: {
+      address: household?.address ?? "",
+      latitude: household?.latitude ?? null,
+      longitude: household?.longitude ?? null,
+    },
   });
   const address =
     addressDraft.householdId === household?.id
       ? addressDraft.value
-      : (household?.address ?? "");
+      : {
+          address: household?.address ?? "",
+          latitude: household?.latitude ?? null,
+          longitude: household?.longitude ?? null,
+        };
   const futureEvents = schedule.events
     .filter(
       (event) =>
@@ -1090,35 +1102,30 @@ function FamilySchedule({ groupId, schedule }: Props) {
               await mutation.mutate(
                 "households",
                 "PATCH",
-                { address, latitude: null, longitude: null },
+                {
+                  address: address.address,
+                  latitude: address.latitude,
+                  longitude: address.longitude,
+                },
                 "save-address",
               );
             }}
           >
-            <label>
-              {t("Address")}
-              <input
-                className="input"
-                type="text"
-                autoComplete="street-address"
-                maxLength={300}
-                required
-                value={address}
-                onChange={(input) =>
-                  setAddressDraft({
-                    householdId: household.id,
-                    value: input.target.value,
-                  })
-                }
-                placeholder={t("123 Main St, City")}
-              />
-            </label>
+            <AddressInput
+              label={t("Address")}
+              required
+              value={address}
+              onChange={(next) =>
+                setAddressDraft({ householdId: household.id, value: next })
+              }
+              placeholder={t("123 Main St, City")}
+            />
             <button
               className="primary-button"
               disabled={
                 mutation.busyKey === "save-address" ||
-                !address.trim() ||
-                address.trim() === household.address
+                !address.address.trim() ||
+                address.address.trim() === household.address
               }
             >
               {mutation.busyKey === "save-address"
@@ -1480,11 +1487,11 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
                 canManage={canManage}
                 busy={Boolean(mutation.busyKey)}
                 onShare={() => shareVenue(location.id)}
-                onSave={(name, address) =>
+                onSave={(name, next) =>
                   mutation.mutate(
                     "locations",
                     "PATCH",
-                    { locationId: location.id, name, address },
+                    { locationId: location.id, name, ...next },
                     `venue-${location.id}`,
                   )
                 }
@@ -1618,16 +1625,11 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
               household={household}
               canManage={canManage}
               busy={Boolean(mutation.busyKey)}
-              onSave={(address) =>
+              onSave={(next) =>
                 mutation.mutate(
                   "households",
                   "PATCH",
-                  {
-                    householdId: household.id,
-                    address,
-                    latitude: null,
-                    longitude: null,
-                  },
+                  { householdId: household.id, ...next },
                   `household-${household.id}`,
                 )
               }
@@ -1670,13 +1672,17 @@ function VenueRow({
   canManage: boolean;
   busy: boolean;
   onShare: () => Promise<boolean>;
-  onSave: (name: string, address: string) => Promise<boolean>;
+  onSave: (name: string, location: AddressValue) => Promise<boolean>;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [name, setName] = useState(location.name);
-  const [address, setAddress] = useState(location.address);
+  const [draft, setDraft] = useState<AddressValue>({
+    address: location.address,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  });
 
   function openInMaps() {
     const provider = savedNavigationProvider(
@@ -1700,7 +1706,7 @@ function VenueRow({
         className="household-address-editor"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (await onSave(name, address)) setEditing(false);
+          if (await onSave(name, draft)) setEditing(false);
         }}
       >
         <input
@@ -1711,13 +1717,11 @@ function VenueRow({
           aria-label={t("Venue name")}
           onChange={(event) => setName(event.target.value)}
         />
-        <input
-          className="input"
+        <AddressInput
           required
-          maxLength={300}
-          value={address}
-          aria-label={t("Address for {{name}}", { name: location.name })}
-          onChange={(event) => setAddress(event.target.value)}
+          value={draft}
+          onChange={setDraft}
+          ariaLabel={t("Address for {{name}}", { name: location.name })}
         />
         <button className="primary-button" disabled={busy}>
           {t("Save")}
@@ -1727,7 +1731,11 @@ function VenueRow({
           type="button"
           onClick={() => {
             setName(location.name);
-            setAddress(location.address);
+            setDraft({
+              address: location.address,
+              latitude: location.latitude,
+              longitude: location.longitude,
+            });
             setEditing(false);
           }}
         >
@@ -1787,11 +1795,15 @@ function HouseholdAddressRow({
   household: GroupSchedule["households"][number];
   canManage: boolean;
   busy: boolean;
-  onSave: (address: string) => Promise<boolean>;
+  onSave: (location: AddressValue) => Promise<boolean>;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
-  const [address, setAddress] = useState(household.address);
+  const [draft, setDraft] = useState<AddressValue>({
+    address: household.address,
+    latitude: household.latitude,
+    longitude: household.longitude,
+  });
 
   return (
     <div className="household-address-row">
@@ -1805,18 +1817,16 @@ function HouseholdAddressRow({
             className="household-address-editor"
             onSubmit={async (event) => {
               event.preventDefault();
-              if (await onSave(address)) setEditing(false);
+              if (await onSave(draft)) setEditing(false);
             }}
           >
-            <input
-              className="input"
+            <AddressInput
               required
-              maxLength={300}
-              value={address}
-              aria-label={t("Address for {{name}}", {
+              value={draft}
+              onChange={setDraft}
+              ariaLabel={t("Address for {{name}}", {
                 name: household.name,
               })}
-              onChange={(event) => setAddress(event.target.value)}
             />
             <button className="primary-button" disabled={busy}>
               {t("Save")}
@@ -1825,7 +1835,11 @@ function HouseholdAddressRow({
               className="text-button"
               type="button"
               onClick={() => {
-                setAddress(household.address);
+                setDraft({
+                  address: household.address,
+                  latitude: household.latitude,
+                  longitude: household.longitude,
+                });
                 setEditing(false);
               }}
             >
@@ -2156,13 +2170,17 @@ function VenueForm({
 }) {
   const { t } = useI18n();
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const [location, setLocation] = useState<AddressValue>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
   return (
     <form
       className="schedule-form"
       onSubmit={(event) => {
         event.preventDefault();
-        onSave({ name, address, latitude: null, longitude: null });
+        onSave({ name, ...location });
       }}
     >
       <label>
@@ -2174,16 +2192,13 @@ function VenueForm({
           onChange={(input) => setName(input.target.value)}
         />
       </label>
-      <label>
-        {t("Address")}
-        <input
-          className="input"
-          required
-          minLength={5}
-          value={address}
-          onChange={(input) => setAddress(input.target.value)}
-        />
-      </label>
+      <AddressInput
+        label={t("Address")}
+        required
+        value={location}
+        onChange={setLocation}
+        placeholder={t("Start typing an address")}
+      />
       <FormActions busy={busy} onCancel={onCancel} />
     </form>
   );
