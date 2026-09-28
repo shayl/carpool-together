@@ -11,6 +11,7 @@ import {
   Info,
   LogOut,
   Settings,
+  Share2,
   ShieldCheck,
   Upload,
   Users,
@@ -988,6 +989,7 @@ function SettingsHome(props: SettingsHomeProps) {
       <h2 className="settings-section-title">{t("App and notifications")}</h2>
       <InstallAppCard />
       <PushReminderSettings />
+      <GroupInvitation groupName={props.group.name} />
       <h2 className="settings-section-title">{t("Help and information")}</h2>
       <section className="settings-link-card">
         <button type="button" onClick={props.onHelp}>
@@ -1145,6 +1147,99 @@ function SettingsHome(props: SettingsHomeProps) {
         </>
       )}
       {props.error && <p className="auth-error">{props.error}</p>}
+    </>
+  );
+}
+
+function GroupInvitation({ groupName }: { groupName: string }) {
+  const { t } = useI18n();
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  function share() {
+    setError("");
+    setMessage("");
+    if (!/^\d{6}$/.test(pin)) {
+      setError(t("Enter the current 6-digit group PIN."));
+      return;
+    }
+
+    const text = t(
+      "Join {{group}} on Carpool Together!\n\nOpen the app: {{url}}\nGroup PIN: {{pin}}",
+      {
+        group: groupName,
+        url: window.location.origin,
+        pin,
+      },
+    );
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    setMessage(
+      t("WhatsApp opened. Choose your group chat to send the invitation."),
+    );
+    setPin("");
+  }
+
+  return (
+    <>
+      <h2 className="settings-section-title">{t("Group invitation")}</h2>
+      <section className="surface-card group-invitation-card">
+        <div className="card-heading">
+          <h2>
+            <Share2 size={20} />
+            {t("Share group")}
+          </h2>
+        </div>
+        <p className="text-muted">
+          {t(
+            "Send this group's app link and current PIN to your WhatsApp group.",
+          )}
+        </p>
+        <form
+          className="schedule-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            share();
+          }}
+        >
+          <label>
+            {t("Current group PIN")}
+            <input
+              className="input"
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              pattern="[0-9]{6}"
+              minLength={6}
+              maxLength={6}
+              required
+              value={pin}
+              onChange={(event) => setPin(event.target.value)}
+            />
+          </label>
+          <p className="text-muted">
+            {t("For privacy, enter the PIN each time you share.")}
+          </p>
+          {error && (
+            <p className="auth-error" role="alert">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p className="auth-message" role="status">
+              {message}
+            </p>
+          )}
+          <button className="primary-button" type="submit">
+            <Share2 size={18} aria-hidden="true" />
+            {t("Share on WhatsApp")}
+          </button>
+        </form>
+      </section>
     </>
   );
 }

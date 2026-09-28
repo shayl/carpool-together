@@ -14,6 +14,20 @@ type Replacements = Record<string, string | number>;
 
 export const hebrew: Record<string, string> = {
   "App and notifications": "אפליקציה והתראות",
+  "Group invitation": "הזמנה לקבוצה",
+  "Share group": "שיתוף הקבוצה",
+  "Send this group's app link and current PIN to your WhatsApp group.":
+    "שלחו לקבוצת ה-WhatsApp את הקישור לאפליקציה ואת קוד ה-PIN הנוכחי.",
+  "Current group PIN": "קוד ה-PIN הנוכחי של הקבוצה",
+  "For privacy, enter the PIN each time you share.":
+    "לשמירה על הפרטיות, הזינו את קוד ה-PIN בכל שיתוף.",
+  "Enter the current 6-digit group PIN.":
+    "הזינו את קוד ה-PIN הנוכחי בן 6 הספרות.",
+  "Share on WhatsApp": "שיתוף ב-WhatsApp",
+  "WhatsApp opened. Choose your group chat to send the invitation.":
+    "WhatsApp נפתח. בחרו את הצ'אט הקבוצתי שאליו תרצו לשלוח את ההזמנה.",
+  "Join {{group}} on Carpool Together!\n\nOpen the app: {{url}}\nGroup PIN: {{pin}}":
+    "הצטרפו ל-{{group}} ב-Carpool Together!\n\nפתחו את האפליקציה: {{url}}\nקוד PIN לקבוצה: {{pin}}",
   "Install app": "התקנת האפליקציה",
   "Help and information": "עזרה ומידע",
   Help: "עזרה",

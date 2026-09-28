@@ -1405,6 +1405,17 @@ button:disabled {
   gap: 0.75rem;
 }
 
+.group-invitation-card {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.group-invitation-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .install-app-card h2 {
   display: flex;
   align-items: center;
