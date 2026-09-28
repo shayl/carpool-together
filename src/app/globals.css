@@ -63,7 +63,8 @@ input[inputmode="numeric"] {
 }
 
 [dir="rtl"] .weekly-event-chevron,
-[dir="rtl"] .settings-link-card > button > span:last-child {
+[dir="rtl"] .settings-link-card > button > span:last-child,
+[dir="rtl"] .schedule-navigation .icon-button svg {
   transform: scaleX(-1);
 }
 
@@ -776,6 +777,10 @@ button:disabled {
 
 .weekly-event-covered {
   border-color: #a8dcc4;
+}
+
+[dir="rtl"] .event-chevron {
+  transform: scaleX(-1);
 }
 
 .event-chevron-expanded {
