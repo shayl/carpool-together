@@ -489,7 +489,9 @@ function EventCard({
           </span>
         </span>
         <ChevronRight
-          className={expanded ? "event-chevron-expanded" : ""}
+          className={
+            expanded ? "event-chevron event-chevron-expanded" : "event-chevron"
+          }
           size={20}
         />
       </button>
