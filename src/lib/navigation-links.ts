@@ -2,6 +2,8 @@ import { hasCoordinates, type GeoStop } from "./route-optimizer";
 
 export type NavigationProvider = "google" | "apple" | "waze";
 
+export const navigationProviderKey = "carpool-navigation-provider";
+
 export function googleRouteUrl(stops: GeoStop[]) {
   const params = new URLSearchParams({
     api: "1",
@@ -22,6 +24,33 @@ export function singleStopUrl(
   return provider === "apple"
     ? `https://maps.apple.com/?daddr=${encodeURIComponent(coordinates)}&dirflg=d`
     : `https://www.waze.com/ul?ll=${encodeURIComponent(coordinates)}&navigate=yes`;
+}
+
+export function placeUrl(provider: NavigationProvider, stop: GeoStop) {
+  const location = coordinate(stop);
+  if (provider === "google") {
+    const params = new URLSearchParams({ api: "1", query: location });
+    return `https://www.google.com/maps/search/?${params}`;
+  }
+  return provider === "apple"
+    ? `https://maps.apple.com/?q=${encodeURIComponent(location)}`
+    : `https://www.waze.com/ul?q=${encodeURIComponent(location)}`;
+}
+
+export function savedNavigationProvider(
+  value: string | null,
+): NavigationProvider {
+  return value === "google" || value === "apple" || value === "waze"
+    ? value
+    : "google";
+}
+
+export function navigationTarget() {
+  const mobile =
+    window.matchMedia("(pointer: coarse)").matches ||
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.userAgent));
+  return mobile ? "_self" : "_blank";
 }
 
 function coordinate(stop: GeoStop) {

@@ -22,6 +22,7 @@ import {
   Pencil,
   Plus,
   Route,
+  Share2,
   Trash2,
   Users,
   X,
@@ -47,6 +48,10 @@ import {
 } from "@/components/ride-status-car";
 import {
   googleRouteUrl,
+  navigationProviderKey,
+  navigationTarget,
+  placeUrl,
+  savedNavigationProvider,
   singleStopUrl,
   type NavigationProvider,
 } from "@/lib/navigation-links";
@@ -684,14 +689,6 @@ function RouteLauncher({
   >(null);
   const [nextStopIndex, setNextStopIndex] = useState(1);
 
-  function navigationTarget() {
-    const mobile =
-      window.matchMedia("(pointer: coarse)").matches ||
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    return mobile ? "_self" : "_blank";
-  }
-
   async function loadRoute() {
     const response = await fetch(`/api/groups/${groupId}/routes`, {
       method: "POST",
@@ -716,9 +713,7 @@ function RouteLauncher({
     setError("");
     try {
       if (!navigator.onLine) throw new Error(t("Reconnect to open a route."));
-      const preference = window.localStorage.getItem(
-        "carpool-navigation-provider",
-      );
+      const preference = window.localStorage.getItem(navigationProviderKey);
       const saved =
         preference === "google" ||
         preference === "apple" ||
@@ -746,7 +741,7 @@ function RouteLauncher({
   }
 
   function launchProvider(provider: NavigationProvider, stops: GeoStop[]) {
-    window.localStorage.setItem("carpool-navigation-provider", provider);
+    window.localStorage.setItem(navigationProviderKey, provider);
     setChoosing(false);
     if (provider === "google") {
       window.open(googleRouteUrl(stops), navigationTarget(), "noopener,noreferrer");
@@ -1297,7 +1292,30 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
     "event" | "recurring" | "venue" | "break" | null
   >(null);
   const [editingEvent, setEditingEvent] = useState<GroupEvent | null>(null);
+  const [shareLink, setShareLink] = useState("");
+  const [importToken, setImportToken] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : (new URLSearchParams(window.location.search).get("venue") ?? ""),
+  );
   const counts = driveCounts(schedule);
+
+  async function shareVenue(locationId: string) {
+    setShareLink("");
+    const response = await fetch(`/api/groups/${groupId}/venue-shares`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locationId }),
+    });
+    const result = (await response.json().catch(() => null)) as {
+      token?: string;
+    } | null;
+    if (!response.ok || !result?.token) return false;
+    const link = `${window.location.origin}/?venue=${result.token}`;
+    await navigator.clipboard?.writeText(link).catch(() => undefined);
+    setShareLink(link);
+    return true;
+  }
 
   return (
     <>
@@ -1444,6 +1462,88 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
       <section className="surface-card">
         <div className="card-heading">
           <div>
+            <h2>{t("Venues")}</h2>
+            <p className="text-muted">
+              {t("Places your events meet. Open one to see it on a map.")}
+            </p>
+          </div>
+          <MapPin size={22} />
+        </div>
+        {schedule.locations.length === 0 ? (
+          <p className="text-muted">{t("No venues yet.")}</p>
+        ) : (
+          <div className="household-address-list">
+            {schedule.locations.map((location) => (
+              <VenueRow
+                key={location.id}
+                location={location}
+                canManage={canManage}
+                busy={Boolean(mutation.busyKey)}
+                onShare={() => shareVenue(location.id)}
+                onSave={(name, address) =>
+                  mutation.mutate(
+                    "locations",
+                    "PATCH",
+                    { locationId: location.id, name, address },
+                    `venue-${location.id}`,
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+        {shareLink && (
+          <p className="auth-message share-link">
+            {t("Share link copied.")} <code>{shareLink}</code>
+          </p>
+        )}
+        {canManage && (
+          <form
+            className="schedule-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              // Accept a full link or a bare token.
+              const token = importToken.trim().split("venue=").at(-1)?.trim();
+              const saved = await mutation.mutate(
+                "venue-shares",
+                "PUT",
+                { token },
+                "import-venue",
+              );
+              if (saved) setImportToken("");
+            }}
+          >
+            <label>
+              {t("Add a venue shared with you")}
+              <input
+                className="input"
+                value={importToken}
+                onChange={(input) => setImportToken(input.target.value)}
+                placeholder={t("Paste a venue share link")}
+              />
+            </label>
+            <button
+              className="secondary-button"
+              disabled={
+                mutation.busyKey === "import-venue" || !importToken.trim()
+              }
+            >
+              {mutation.busyKey === "import-venue"
+                ? t("Adding…")
+                : t("Add shared venue")}
+            </button>
+            <p className="auth-footnote">
+              {t(
+                "You get your own copy to edit. Adding the same link again restores the original details.",
+              )}
+            </p>
+          </form>
+        )}
+      </section>
+
+      <section className="surface-card">
+        <div className="card-heading">
+          <div>
             <h2>{t("Group breaks")}</h2>
             <p className="text-muted">
               {t(
@@ -1556,6 +1656,125 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
       {mutation.error && <p className="auth-error">{mutation.error}</p>}
       {mutation.message && <p className="auth-message">{mutation.message}</p>}
     </>
+  );
+}
+
+function VenueRow({
+  location,
+  canManage,
+  busy,
+  onShare,
+  onSave,
+}: {
+  location: GroupSchedule["locations"][number];
+  canManage: boolean;
+  busy: boolean;
+  onShare: () => Promise<boolean>;
+  onSave: (name: string, address: string) => Promise<boolean>;
+}) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [name, setName] = useState(location.name);
+  const [address, setAddress] = useState(location.address);
+
+  function openInMaps() {
+    const provider = savedNavigationProvider(
+      window.localStorage.getItem(navigationProviderKey),
+    );
+    window.open(
+      placeUrl(provider, {
+        label: location.name,
+        address: location.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      }),
+      navigationTarget(),
+      "noopener,noreferrer",
+    );
+  }
+
+  if (editing) {
+    return (
+      <form
+        className="household-address-editor"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (await onSave(name, address)) setEditing(false);
+        }}
+      >
+        <input
+          className="input"
+          required
+          maxLength={160}
+          value={name}
+          aria-label={t("Venue name")}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <input
+          className="input"
+          required
+          maxLength={300}
+          value={address}
+          aria-label={t("Address for {{name}}", { name: location.name })}
+          onChange={(event) => setAddress(event.target.value)}
+        />
+        <button className="primary-button" disabled={busy}>
+          {t("Save")}
+        </button>
+        <button
+          className="text-button"
+          type="button"
+          onClick={() => {
+            setName(location.name);
+            setAddress(location.address);
+            setEditing(false);
+          }}
+        >
+          {t("Cancel")}
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="household-address-row">
+      <div>
+        <strong>{location.name}</strong>
+        <address>{location.address}</address>
+      </div>
+      <span className="row-actions">
+        <button className="text-button" type="button" onClick={openInMaps}>
+          <MapPin size={16} />
+          {t("Open in maps")}
+        </button>
+        {canManage && (
+          <>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil size={16} />
+              {t("Edit")}
+            </button>
+            <button
+              className="text-button"
+              type="button"
+              disabled={sharing}
+              onClick={async () => {
+                setSharing(true);
+                await onShare();
+                setSharing(false);
+              }}
+            >
+              <Share2 size={16} />
+              {sharing ? t("Sharing…") : t("Share")}
+            </button>
+          </>
+        )}
+      </span>
+    </div>
   );
 }
 

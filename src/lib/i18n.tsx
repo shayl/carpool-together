@@ -193,6 +193,23 @@ export const hebrew: Record<string, string> = {
   "Add one-time events or recurring weekly events.":
     "הוסיפו אירועים חד-פעמיים או אירועים שבועיים קבועים.",
   "Add venue": "הוספת מקום",
+  Venues: "מקומות",
+  "Places your events meet. Open one to see it on a map.":
+    "המקומות שבהם מתקיימים האירועים. פתחו מקום כדי לראות אותו במפה.",
+  "No venues yet.": "עדיין אין מקומות.",
+  "Open in maps": "פתיחה במפות",
+  Share: "שיתוף",
+  "Sharing…": "משתפים…",
+  "Share link copied.": "קישור השיתוף הועתק.",
+  "Choose a venue to share.": "בחרו מקום לשיתוף.",
+  "Add a venue shared with you": "הוספת מקום ששותף אתכם",
+  "Paste a venue share link": "הדביקו קישור לשיתוף מקום",
+  "Add shared venue": "הוספת המקום המשותף",
+  "You get your own copy to edit. Adding the same link again restores the original details.":
+    "תקבלו עותק משלכם לעריכה. הוספה חוזרת של אותו קישור תשחזר את הפרטים המקוריים.",
+  "Invalid share link.": "קישור שיתוף שגוי.",
+  "This share link is no longer available.": "קישור השיתוף אינו זמין יותר.",
+  "At least one venue field is required.": "נדרש למלא לפחות שדה אחד של המקום.",
   Address: "כתובת",
   "Home address": "כתובת הבית",
   "Used only to coordinate pickups and routes within your group.":

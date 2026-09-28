@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { googleRouteUrl, singleStopUrl } from "./navigation-links";
+import {
+  googleRouteUrl,
+  placeUrl,
+  savedNavigationProvider,
+  singleStopUrl,
+} from "./navigation-links";
 import type { GeoStop } from "./route-optimizer";
 
 const stops: GeoStop[] = [
@@ -20,6 +25,37 @@ test("builds a complete Google Maps route", () => {
 test("builds Apple Maps and Waze links for one stop", () => {
   assert.match(singleStopUrl("apple", stops[1]), /^https:\/\/maps\.apple\.com/);
   assert.match(singleStopUrl("waze", stops[1]), /^https:\/\/www\.waze\.com/);
+});
+
+test("opens a single place in each maps provider", () => {
+  assert.match(placeUrl("google", stops[1]), /^https:\/\/www\.google\.com/);
+  assert.match(placeUrl("apple", stops[1]), /^https:\/\/maps\.apple\.com/);
+  assert.match(placeUrl("waze", stops[1]), /^https:\/\/www\.waze\.com/);
+  assert.equal(
+    new URL(placeUrl("google", stops[1])).searchParams.get("query"),
+    "47.2,-122.2",
+  );
+});
+
+test("falls back to a place address without coordinates", () => {
+  const venue: GeoStop = {
+    label: "Venue",
+    address: "123 Example Street",
+    latitude: null,
+    longitude: null,
+  };
+
+  assert.equal(
+    new URL(placeUrl("google", venue)).searchParams.get("query"),
+    "123 Example Street",
+  );
+  assert.match(placeUrl("waze", venue), /q=123%20Example%20Street/);
+});
+
+test("defaults unknown saved providers to Google Maps", () => {
+  assert.equal(savedNavigationProvider(null), "google");
+  assert.equal(savedNavigationProvider("nonsense"), "google");
+  assert.equal(savedNavigationProvider("waze"), "waze");
 });
 
 test("uses a street address when coordinates are unavailable", () => {
