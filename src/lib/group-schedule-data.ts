@@ -73,7 +73,7 @@ export async function loadGroupSchedules(
       .in("group_id", authorizedGroupIds),
     admin
       .from("group_ride_claims")
-      .select("id, group_id, event_id, leg, household_id, claimed_by")
+      .select("id, group_id, event_id, leg, household_id, driver_roster_entry_id, claimed_by")
       .in("group_id", authorizedGroupIds),
     admin
       .from("group_breaks")
@@ -93,7 +93,7 @@ export async function loadGroupSchedules(
       .in("group_id", authorizedGroupIds),
     admin
       .from("group_access_roster")
-      .select("id, group_id, household_id, photo_path")
+      .select("id, group_id, household_id, display_name, photo_path, active")
       .in("group_id", authorizedGroupIds),
   ]);
 
@@ -128,17 +128,30 @@ export async function loadGroupSchedules(
       households: byGroup(
         householdsResult.data,
         membership.group_id,
-      ).map(
-        (row): GroupHousehold => ({
+      ).map((row): GroupHousehold => {
+        // The stored name was seeded from a single member, so it goes stale
+        // once two parents share a household. Name it after whoever is
+        // actually in it.
+        const members = (rosterResult.data ?? [])
+          .filter(
+            (entry) =>
+              entry.group_id === membership.group_id &&
+              entry.household_id === row.id &&
+              entry.active,
+          )
+          .map((entry) => entry.display_name as string);
+
+        return {
           id: row.id,
           groupId: row.group_id,
           rosterEntryId: row.roster_entry_id,
-          name: row.name,
+          name: members.length ? members.join(" & ") : row.name,
+          memberNames: members,
           address: row.address,
           latitude: row.latitude,
           longitude: row.longitude,
-        }),
-      ),
+        };
+      }),
       participants: byGroup(
         participantsResult.data,
         membership.group_id,
@@ -209,6 +222,7 @@ export async function loadGroupSchedules(
           eventId: row.event_id,
           leg: row.leg,
           householdId: row.household_id,
+          driverRosterEntryId: row.driver_roster_entry_id,
           claimedBy: row.claimed_by,
         }),
       ),

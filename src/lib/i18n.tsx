@@ -193,6 +193,8 @@ export const hebrew: Record<string, string> = {
   "Add one-time events or recurring weekly events.":
     "הוסיפו אירועים חד-פעמיים או אירועים שבועיים קבועים.",
   "Add venue": "הוספת מקום",
+  Driver: "נהג/ת",
+  "That driver is not available.": "הנהג/ת אינו/ה זמין/ה.",
   "Drivers in this household": "הנהגים במשק הבית הזה",
   "Every driver here can claim and drive this household's rides.":
     "כל נהג/ת כאן יכול/ה לקחת ולנהוג בנסיעות של משק הבית.",

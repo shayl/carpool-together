@@ -156,7 +156,7 @@ function useMutation(groupId: string) {
   return { busyKey, error, message, mutate };
 }
 
-function RidesSchedule({ groupId, groupName, schedule }: Props) {
+function RidesSchedule({ groupId, groupName, schedule, roster }: Props) {
   const { t, locale } = useI18n();
   const mutation = useMutation(groupId);
   const [display, setDisplay] = useState<"week" | "month">("week");
@@ -355,6 +355,7 @@ function RidesSchedule({ groupId, groupName, schedule }: Props) {
               key={event.id}
               event={event}
               schedule={schedule}
+              roster={roster}
               expanded={expanded === event.id}
               onToggle={() =>
                 setExpanded((current) => (current === event.id ? null : event.id))
@@ -441,12 +442,14 @@ function MonthGrid({
 function EventCard({
   event,
   schedule,
+  roster,
   expanded,
   onToggle,
   mutation,
 }: {
   event: GroupEvent;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
   expanded: boolean;
   onToggle: () => void;
   mutation: ReturnType<typeof useMutation>;
@@ -540,6 +543,7 @@ function EventCard({
               event={event}
               leg={leg}
               schedule={schedule}
+              roster={roster}
               mutation={mutation}
             />
           ))}
@@ -562,17 +566,29 @@ function RideLegPanel({
   event,
   leg,
   schedule,
+  roster,
   mutation,
 }: {
   event: GroupEvent;
   leg: RideLeg;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
   mutation: ReturnType<typeof useMutation>;
 }) {
   const { t } = useI18n();
   const ride = rideState(schedule, event, leg);
-  const [householdId, setHouseholdId] = useState(
-    schedule.currentHouseholdId ?? schedule.households[0]?.id ?? "",
+  // Drivers are people, not households: every adult attached to a household
+  // can take a ride, and picking one implies their household.
+  const drivers = roster.filter(
+    (member) => member.active && member.householdId,
+  );
+  const [driverId, setDriverId] = useState(
+    () =>
+      drivers.find(
+        (member) => member.householdId === schedule.currentHouseholdId,
+      )?.id ??
+      drivers[0]?.id ??
+      "",
   );
   if (!ride.active) return null;
   const riderHouseholds = [
@@ -599,7 +615,11 @@ function RideLegPanel({
       {ride.claim ? (
         <div className="claim-row">
           <strong>
-            {ride.household?.name ?? t("Assigned family")}
+            {roster.find(
+              (member) => member.id === ride.claim?.driverRosterEntryId,
+            )?.displayName ??
+              ride.household?.name ??
+              t("Assigned family")}
           </strong>
           <button
             className="secondary-button"
@@ -621,25 +641,25 @@ function RideLegPanel({
         <div className="claim-row">
           <select
             className="input"
-            aria-label={t("Driving family")}
-            value={householdId}
-            onChange={(item) => setHouseholdId(item.target.value)}
+            aria-label={t("Driver")}
+            value={driverId}
+            onChange={(item) => setDriverId(item.target.value)}
           >
-            {schedule.households.map((household) => (
-              <option key={household.id} value={household.id}>
-                {household.name}
+            {drivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>
+                {driver.displayName}
               </option>
             ))}
           </select>
           <button
             className="primary-button"
             type="button"
-            disabled={!householdId || Boolean(mutation.busyKey)}
+            disabled={!driverId || Boolean(mutation.busyKey)}
             onClick={() =>
               mutation.mutate(
                 "claims",
                 "POST",
-                { eventId: event.id, leg, householdId },
+                { eventId: event.id, leg, driverRosterEntryId: driverId },
                 `claim-${event.id}-${leg}`,
               )
             }
@@ -654,7 +674,14 @@ function RideLegPanel({
       <div className="ride-address-list">
         {ride.household && (
           <address>
-            <strong>{t("Driver: {{name}}", { name: ride.household.name })}</strong>
+            <strong>
+              {t("Driver: {{name}}", {
+                name:
+                  roster.find(
+                    (member) => member.id === ride.claim?.driverRosterEntryId,
+                  )?.displayName ?? ride.household.name,
+              })}
+            </strong>
             <span>{ride.household.address || t("No address added")}</span>
           </address>
         )}
