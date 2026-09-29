@@ -1715,10 +1715,12 @@ function TeamSchedule({
   groupId,
   canManage,
   schedule,
+  roster,
   offline,
   initialNavigation,
 }: Props) {
   const { t } = useI18n();
+  const router = useRouter();
   const mutation = useMutation(groupId, offline);
   const [panel, setPanel] = useState<
     "event" | "recurring" | "venue" | "break" | null
@@ -1729,7 +1731,39 @@ function TeamSchedule({
   >(null);
   const [shareLink, setShareLink] = useState("");
   const [importToken, setImportToken] = useState(initialNavigation.venueToken);
+  const [editingHousehold, setEditingHousehold] = useState<string | null>(null);
+  const [savingHousehold, setSavingHousehold] = useState(false);
+  const [householdError, setHouseholdError] = useState("");
   const counts = driveCounts(schedule);
+
+  async function saveHouseholdDetails(input: FamilyDetailsInput) {
+    setSavingHousehold(true);
+    setHouseholdError("");
+    try {
+      if (offline || !navigator.onLine) {
+        throw new Error(t("Reconnect to make changes."));
+      }
+      const response = await fetch(
+        `/api/groups/${groupId}/households/family`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        },
+      );
+      await readResult(response);
+      setEditingHousehold(null);
+      router.refresh();
+      return true;
+    } catch (caught) {
+      setHouseholdError(
+        caught instanceof Error ? t(caught.message) : t("Change failed."),
+      );
+      return false;
+    } finally {
+      setSavingHousehold(false);
+    }
+  }
 
   async function shareVenue(locationId: string) {
     setShareLink("");
@@ -2059,53 +2093,101 @@ function TeamSchedule({
       <section className="surface-card">
         <div className="card-heading">
           <div>
-            <h2>{t("Household addresses")}</h2>
+            <h2>{t("Households")}</h2>
             <p className="text-muted">
-              {t("Visible to group members for pickups and driving routes.")}
-            </p>
-          </div>
-          <MapPin size={22} />
-        </div>
-        <div className="household-address-list">
-          {schedule.households.map((household) => (
-            <HouseholdAddressRow
-              key={household.id}
-              household={household}
-              canManage={canManage}
-              busy={Boolean(mutation.busyKey)}
-              onSave={(next) =>
-                mutation.mutate(
-                  "households",
-                  "PATCH",
-                  { householdId: household.id, ...next },
-                  `household-${household.id}`,
-                )
-              }
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="surface-card">
-        <div className="card-heading">
-          <div>
-            <h2>{t("Drive counts")}</h2>
-            <p className="text-muted">
-              {t("One count per active assigned ride.")}
+              {t(
+                "Who lives together, their pickup address, and how much they have driven.",
+              )}
             </p>
           </div>
           <Users size={22} />
         </div>
-        {counts.map(({ household, count }) => (
-          <div className="drive-count-row" key={household.id}>
-            <span>{household.name}</span>
-            <strong>{t("{{count}} rides", { count })}</strong>
-          </div>
-        ))}
+        <div className="household-list">
+          {counts.map(({ household, count }) => (
+            <HouseholdRow
+              key={household.id}
+              household={household}
+              riders={schedule.participants.filter(
+                (rider) => rider.householdId === household.id,
+              )}
+              driveCount={count}
+              canManage={canManage}
+              onEdit={() => setEditingHousehold(household.id)}
+            />
+          ))}
+        </div>
       </section>
+      {editingHousehold &&
+        (() => {
+          const target = schedule.households.find(
+            (item) => item.id === editingHousehold,
+          );
+          if (!target) return null;
+          return (
+            <Sheet
+              title={t("Edit family details")}
+              busy={savingHousehold}
+              onClose={() => setEditingHousehold(null)}
+            >
+              <FamilyEditForm
+                household={target}
+                guardians={roster.filter(
+                  (member) => member.active && member.householdId === target.id,
+                )}
+                riders={schedule.participants.filter(
+                  (rider) => rider.householdId === target.id,
+                )}
+                busy={savingHousehold}
+                error={householdError}
+                onSubmit={saveHouseholdDetails}
+              />
+            </Sheet>
+          );
+        })()}
       {mutation.error && <p className="auth-error">{mutation.error}</p>}
       {mutation.message && <p className="auth-message">{mutation.message}</p>}
     </>
+  );
+}
+
+function HouseholdRow({
+  household,
+  riders,
+  driveCount,
+  canManage,
+  onEdit,
+}: {
+  household: GroupSchedule["households"][number];
+  riders: GroupSchedule["participants"];
+  driveCount: number;
+  canManage: boolean;
+  onEdit: () => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="household-row">
+      <div className="household-row-main">
+        <strong>{household.name}</strong>
+        <address>{household.address || t("No address added")}</address>
+        {riders.length > 0 && (
+          <span className="household-row-riders">
+            {t("Riders")}: {riders.map((rider) => rider.name).join(", ")}
+          </span>
+        )}
+      </div>
+      <div className="household-row-side">
+        <span className="household-row-drives">
+          {t("{{count}} rides", { count: driveCount })}
+        </span>
+        {canManage && (
+          <button className="text-button" type="button" onClick={onEdit}>
+            <Pencil size={16} />
+            {t("Edit")}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2231,80 +2313,6 @@ function VenueRow({
           </>
         )}
       </span>
-    </div>
-  );
-}
-
-function HouseholdAddressRow({
-  household,
-  canManage,
-  busy,
-  onSave,
-}: {
-  household: GroupSchedule["households"][number];
-  canManage: boolean;
-  busy: boolean;
-  onSave: (location: AddressValue) => Promise<boolean>;
-}) {
-  const { t } = useI18n();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<AddressValue>({
-    address: household.address,
-    latitude: household.latitude,
-    longitude: household.longitude,
-  });
-
-  return (
-    <div className="household-address-row">
-      <div>
-        <strong>{household.name}</strong>
-        <address>{household.address || t("No address added")}</address>
-      </div>
-      {canManage &&
-        (editing ? (
-          <form
-            className="household-address-editor"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (await onSave(draft)) setEditing(false);
-            }}
-          >
-            <AddressInput
-              required
-              value={draft}
-              onChange={setDraft}
-              ariaLabel={t("Address for {{name}}", {
-                name: household.name,
-              })}
-            />
-            <button className="primary-button" disabled={busy}>
-              {t("Save")}
-            </button>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => {
-                setDraft({
-                  address: household.address,
-                  latitude: household.latitude,
-                  longitude: household.longitude,
-                });
-                setEditing(false);
-              }}
-            >
-              {t("Cancel")}
-            </button>
-          </form>
-        ) : (
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil size={16} />
-            {household.address ? t("Edit address") : t("Add address")}
-          </button>
-        ))}
     </div>
   );
 }

@@ -265,6 +265,19 @@ export const hebrew: Record<string, string> = {
   "Rider not found in your household.": "הנוסע/ת לא נמצא/ה במשק הבית שלכם.",
   "Remove {{name}} from this household?": "להסיר את {{name}} ממשק הבית הזה?",
   "Combine households": "איחוד משקי בית",
+  Households: "משקי בית",
+  "Who lives together, their pickup address, and how much they have driven.":
+    "מי גר יחד, כתובת האיסוף, וכמה נסיעות ביצעו.",
+  "Select everyone who lives together — parents, a grandparent, an older sibling who drives — and combine them into one household.":
+    "בחרו את כל מי שגר יחד — הורים, סבא או סבתא, אח או אחות בוגרים שנוהגים — ואחדו אותם למשק בית אחד.",
+  "Combine {{count}} members": "איחוד {{count}} חברים",
+  "Choose at least two members to combine.": "בחרו לפחות שני חברים לאיחוד.",
+  "Combine these members into one household? They will share riders, rides, and driving responsibility.":
+    "לאחד את החברים האלה למשק בית אחד? הם יחלקו נוסעים, נסיעות ואחריות נהיגה.",
+  "Role for {{name}}": "תפקיד עבור {{name}}",
+  "Could not change the role.": "לא ניתן לשנות את התפקיד.",
+  "Choose a valid role.": "בחרו תפקיד תקין.",
+  "A group needs at least one owner.": "לקבוצה נדרש לפחות בעלים אחד.",
   "Put two members in one household so they share the same riders and rides.":
     "שימו שני חברים במשק בית אחד כדי שיחלקו את אותם נוסעים ונסיעות.",
   "Choose two different members.": "בחרו שני חברים שונים.",

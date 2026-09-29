@@ -67,8 +67,7 @@ export function CarpoolApp({
     "admin" | "coordinator" | "member"
   >("member");
   const [csv, setCsv] = useState("");
-  const [mergeMember, setMergeMember] = useState("");
-  const [intoMember, setIntoMember] = useState("");
+  const [mergeSelection, setMergeSelection] = useState<string[]>([]);
   const [newGroupName, setNewGroupName] = useState("");
   const [existingGroupPhone, setExistingGroupPhone] = useState("");
   const [existingGroupPin, setExistingGroupPin] = useState("");
@@ -256,14 +255,14 @@ export function CarpoolApp({
 
   async function mergeHouseholds(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!mergeMember || !intoMember || mergeMember === intoMember) {
-      setError(t("Choose two different members to combine."));
+    if (mergeSelection.length < 2) {
+      setError(t("Choose at least two members to combine."));
       return;
     }
     if (
       !window.confirm(
         t(
-          "Combine these members into one household? They will share rides and driving responsibility.",
+          "Combine these members into one household? They will share riders, rides, and driving responsibility.",
         ),
       )
     ) {
@@ -277,10 +276,7 @@ export function CarpoolApp({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mergeRosterEntryId: mergeMember,
-            intoRosterEntryId: intoMember,
-          }),
+          body: JSON.stringify({ rosterEntryIds: mergeSelection }),
         },
       );
       const result = (await response.json()) as { error?: string };
@@ -289,14 +285,40 @@ export function CarpoolApp({
           result.error ? t(result.error) : t("Could not combine households."),
         );
       }
-      setMergeMember("");
-      setIntoMember("");
+      setMergeSelection([]);
       router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
           : t("Could not combine households."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changeMemberRole(rosterEntryId: string, role: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/groups/${group.id}/roster/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rosterEntryId, role }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          result.error ? t(result.error) : t("Could not change the role."),
+        );
+      }
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : t("Could not change the role."),
       );
     } finally {
       setLoading(false);
@@ -671,59 +693,63 @@ export function CarpoolApp({
                       </span>
                     )}
                   </div>
-                  <small>{t(member.role)}</small>
+                  {group.canManageRoster ? (
+                      <select
+                        className="input member-role-select"
+                        aria-label={t("Role for {{name}}", {
+                          name: member.displayName,
+                        })}
+                        value={member.role}
+                        disabled={loading}
+                        onChange={(event) =>
+                          void changeMemberRole(member.id, event.target.value)
+                        }
+                      >
+                        <option value="member">{t("member")}</option>
+                        <option value="coordinator">{t("coordinator")}</option>
+                        <option value="admin">{t("admin")}</option>
+                        <option value="owner">{t("owner")}</option>
+                      </select>
+                  ) : (
+                    <small>{t(member.role)}</small>
+                  )}
                 </div>
               ))}
               {group.canManageRoster && (
-                <form
-                  className="schedule-form"
-                  onSubmit={mergeHouseholds}
-                >
+                <form className="schedule-form" onSubmit={mergeHouseholds}>
                   <h2>{t("Combine households")}</h2>
                   <p className="text-muted">
                     {t(
-                      "Put two members in one household so they share the same riders and rides.",
+                      "Select everyone who lives together \u2014 parents, a grandparent, an older sibling who drives \u2014 and combine them into one household.",
                     )}
                   </p>
-                  <label>
-                    {t("Member")}
-                    <select
-                      className="input"
-                      required
-                      value={mergeMember}
-                      onChange={(event) => setMergeMember(event.target.value)}
-                    >
-                      <option value="">{t("Choose member")}</option>
-                      {group.roster.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    {t("Into household of")}
-                    <select
-                      className="input"
-                      required
-                      value={intoMember}
-                      onChange={(event) => setIntoMember(event.target.value)}
-                    >
-                      <option value="">{t("Choose member")}</option>
-                      {group.roster.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="merge-member-list">
+                    {group.roster.map((member) => (
+                      <label className="merge-member" key={member.id}>
+                        <input
+                          type="checkbox"
+                          checked={mergeSelection.includes(member.id)}
+                          onChange={(event) =>
+                            setMergeSelection((current) =>
+                              event.target.checked
+                                ? [...current, member.id]
+                                : current.filter((id) => id !== member.id),
+                            )
+                          }
+                        />
+                        <span>{member.displayName}</span>
+                      </label>
+                    ))}
+                  </div>
                   <button
                     className="primary-button"
-                    disabled={
-                      loading || !mergeMember || !intoMember || mergeMember === intoMember
-                    }
+                    disabled={loading || mergeSelection.length < 2}
                   >
-                    {loading ? t("Saving…") : t("Combine")}
+                    {loading
+                      ? t("Saving\u2026")
+                      : t("Combine {{count}} members", {
+                          count: mergeSelection.length,
+                        })}
                   </button>
                 </form>
               )}
