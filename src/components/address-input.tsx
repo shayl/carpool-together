@@ -1,11 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useId, useState } from "react";
 import {
   minimumQueryLength,
   type AddressSuggestion,
 } from "@/lib/address-suggestions";
 import { useI18n } from "@/lib/i18n";
+
+const AddressMapPicker = dynamic(
+  () =>
+    import("@/components/address-map-picker").then(
+      (module) => module.AddressMapPicker,
+    ),
+  { ssr: false },
+);
 
 export type AddressValue = {
   address: string;
@@ -24,6 +33,7 @@ export function AddressInput({
   placeholder,
   required,
   disabled,
+  mapKind = "home",
   maxLength = 300,
 }: {
   value: AddressValue;
@@ -33,6 +43,7 @@ export function AddressInput({
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  mapKind?: "home" | "venue";
   maxLength?: number;
 }) {
   const { t } = useI18n();
@@ -132,6 +143,12 @@ export function AddressInput({
           }}
         />
       </label>
+      <AddressMapPicker
+        kind={mapKind}
+        address={value.address}
+        disabled={disabled}
+        onSelect={onChange}
+      />
       {visible && (
         <div className="address-suggestions">
           <ul id={listId} role="listbox">

@@ -78,6 +78,18 @@ export async function loadAppData(userId: string) {
 
     const role = membership.role as GroupRole;
     const canManageRoster = role === "owner" || role === "admin";
+    const schedule = schedules.get(group.id) ?? {
+      households: [],
+      participants: [],
+      locations: [],
+      events: [],
+      attendance: [],
+      claims: [],
+      breaks: [],
+      absencePeriods: [],
+      templates: [],
+      currentHouseholdId: null,
+    };
     const groupRoster = (roster ?? []).filter(
       (entry) => entry.group_id === group.id,
     );
@@ -98,23 +110,15 @@ export async function loadAppData(userId: string) {
         canManageRoster,
         currentRosterEntryId: membership.roster_entry_id,
         currentMemberName: currentRosterEntry?.display_name ?? "Member",
-        schedule: schedules.get(group.id) ?? {
-          households: [],
-          participants: [],
-          locations: [],
-          events: [],
-          attendance: [],
-          claims: [],
-          breaks: [],
-          absencePeriods: [],
-          templates: [],
-          currentHouseholdId: null,
-        },
+        schedule,
         roster: groupRoster.map((entry) => ({
             id: entry.id,
             householdId: entry.household_id,
             displayName: entry.display_name,
-            ...(canManageRoster ? { phone: entry.phone } : {}),
+            ...(canManageRoster ||
+            entry.household_id === schedule.currentHouseholdId
+              ? { phone: entry.phone }
+              : {}),
             ...(entry.photo_path
               ? {
                   photoUrl: `/api/groups/${group.id}/roster/${entry.id}/photo`,

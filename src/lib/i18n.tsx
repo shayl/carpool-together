@@ -163,6 +163,62 @@ export const hebrew: Record<string, string> = {
   "Still needs a seat:": "עדיין זקוקים למקום:",
   "Unable to plan rides.": "לא ניתן לתכנן את הנסיעות.",
   "Your riders, your plans.": "הנוסעים והתוכניות שלכם.",
+  "{{name}} family": "משפחת {{name}}",
+  "Week of {{date}}": "השבוע של {{date}}",
+  "Change a daily ride": "שינוי נסיעה יומית",
+  "Rider absences": "היעדרויות נוסעים",
+  "Applies to scheduled events. Only your family can change these dates.":
+    "חל על אירועים מתוכננים. רק המשפחה שלכם יכולה לשנות את התאריכים האלה.",
+  "Show past dates": "הצגת תאריכים קודמים",
+  "Hide past dates": "הסתרת תאריכים קודמים",
+  "Family details": "פרטי המשפחה",
+  "Edit family details": "עריכת פרטי המשפחה",
+  "Hide family details": "הסתרת פרטי המשפחה",
+  "Discard your unsaved changes?": "לבטל את השינויים שלא נשמרו?",
+  "Close {{title}}": "סגירת {{title}}",
+  "Family name": "שם המשפחה",
+  "Parent / guardian": "הורה / אפוטרופוס",
+  "This guardian is required for your active account.":
+    "האפוטרופוס הזה נדרש עבור החשבון הפעיל שלכם.",
+  "A protected guardian cannot be removed.":
+    "לא ניתן להסיר אפוטרופוס מוגן.",
+  "A submitted rider does not belong to this household.":
+    "הנוסע שנשלח אינו שייך למשק הבית הזה.",
+  "Remove guardian": "הסרת אפוטרופוס",
+  Phone: "טלפון",
+  Rider: "נוסע",
+  "+ Guardian": "+ אפוטרופוס",
+  "+ Rider": "+ נוסע",
+  "Save family changes": "שמירת השינויים במשפחה",
+  "Choose with map pin": "בחירה באמצעות סיכה במפה",
+  "Choose home location": "בחירת מיקום הבית",
+  "Choose venue location": "בחירת מיקום המקום",
+  "Tap the map or drag the pin": "הקישו על המפה או גררו את הסיכה",
+  "Use current location": "שימוש במיקום הנוכחי",
+  "Finding street address…": "מאתרים כתובת רחוב…",
+  "Tap a location on the map.": "הקישו על מיקום במפה.",
+  "Use this address": "שימוש בכתובת הזו",
+  "We could not locate the typed address. Tap the map to choose it.":
+    "לא הצלחנו לאתר את הכתובת שהוקלדה. הקישו על המפה כדי לבחור אותה.",
+  "Could not find the address.": "לא ניתן למצוא את הכתובת.",
+  "Location services are not available on this device.":
+    "שירותי מיקום אינם זמינים במכשיר הזה.",
+  "Allow location access to use your current position.":
+    "אפשרו גישה למיקום כדי להשתמש במיקום הנוכחי שלכם.",
+  "The map service could not resolve this location.":
+    "שירות המפות לא הצליח לזהות את המיקום הזה.",
+  "No street address was found at that location.":
+    "לא נמצאה כתובת רחוב במיקום הזה.",
+  "Invalid map location.": "מיקום המפה אינו תקין.",
+  "The map service is temporarily unavailable.":
+    "שירות המפות אינו זמין זמנית.",
+  "Offline — showing saved information. Reconnect to make changes or open a route.":
+    "אין חיבור — מוצג מידע שמור. התחברו מחדש כדי לבצע שינויים או לפתוח מסלול.",
+  "Reconnect to make changes.": "התחברו מחדש כדי לבצע שינויים.",
+  "Could not add the venue.": "לא ניתן להוסיף את המקום.",
+  "No riders in this family yet": "עדיין אין נוסעים במשפחה הזו",
+  "Use Edit family details to add the first rider.":
+    "השתמשו בעריכת פרטי המשפחה כדי להוסיף את הנוסע הראשון.",
   Family: "משפחה",
   "No rider yet": "עדיין אין נוסע",
   "Thursday practice": "אימון ביום חמישי",

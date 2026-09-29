@@ -145,7 +145,7 @@ export async function loadGroupSchedules(
           id: row.id,
           groupId: row.group_id,
           rosterEntryId: row.roster_entry_id,
-          name: members.length ? members.join(" & ") : row.name,
+          name: row.name,
           memberNames: members,
           address: row.address,
           latitude: row.latitude,
