@@ -42,6 +42,13 @@ Open `http://localhost:3000`. Use `localhost` consistently during development
 because authentication cookies do not carry over to `127.0.0.1`. Loopback-IP
 browser visits are replaced with the canonical local hostname.
 
+## App icons
+
+`public/icon.svg` is the source artwork for the happy carpool icon. Keep the
+192px and 512px PNGs in `public`, the 180px `src/app/apple-icon.png`, and the
+16px/32px/48px `src/app/favicon.ico` in sync when changing the artwork.
+The full-bleed background and centered car also support maskable home-screen icons.
+
 ## Validate
 
 ```powershell
