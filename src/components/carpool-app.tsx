@@ -694,22 +694,28 @@ export function CarpoolApp({
                     )}
                   </div>
                   {group.canManageRoster ? (
-                      <select
-                        className="input member-role-select"
-                        aria-label={t("Role for {{name}}", {
-                          name: member.displayName,
-                        })}
-                        value={member.role}
+                    member.role === "admin" || member.role === "owner" ? (
+                      <small>{t(member.role)}</small>
+                    ) : (
+                      <button
+                        className="text-button make-admin-link"
+                        type="button"
                         disabled={loading}
-                        onChange={(event) =>
-                          void changeMemberRole(member.id, event.target.value)
-                        }
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              t("Make {{name}} an organizer?", {
+                                name: member.displayName,
+                              }),
+                            )
+                          ) {
+                            void changeMemberRole(member.id, "admin");
+                          }
+                        }}
                       >
-                        <option value="member">{t("member")}</option>
-                        <option value="coordinator">{t("coordinator")}</option>
-                        <option value="admin">{t("admin")}</option>
-                        <option value="owner">{t("owner")}</option>
-                      </select>
+                        {t("Make organizer")}
+                      </button>
+                    )
                   ) : (
                     <small>{t(member.role)}</small>
                   )}

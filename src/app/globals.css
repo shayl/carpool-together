@@ -2341,3 +2341,10 @@ button:disabled {
   padding: 0 8px;
   font-size: 13px;
 }
+
+.make-admin-link {
+  color: var(--team);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -228,6 +228,8 @@ export const hebrew: Record<string, string> = {
   "{{count}} people": "{{count}} אנשים",
   "Phone hidden": "מספר הטלפון מוסתר",
   owner: "בעלים",
+  "Make organizer": "מינוי כמנהל",
+  "Make {{name}} an organizer?": "למנות את {{name}} כמנהל?",
   admin: "מנהל",
   coordinator: "רכז",
   member: "חבר",
