@@ -16,15 +16,20 @@ Carpool database or reuse that application's credentials.
 - Switch between English and Hebrew with persistent RTL localization.
 - Protect each group with a private phone roster and hashed shared PIN.
 - Let owners import roster members from pasted name/phone data.
-- Send validated requests to a server-side suggestion endpoint.
-- Produce deterministic, capacity-aware trips and explain uncovered riders.
+- Manage household guardians, riders, addresses, and absences.
+- Choose household and venue addresses with autocomplete or a draggable map pin.
+- Create reusable venues, recurring schedules, and one-time events.
+- Track separate outbound and return rides with named drivers.
+- Edit daily attendance and ride needs from the weekly schedule.
+- View weekly and monthly calendars, with URL-backed navigation state.
+- Receive live cross-device schedule updates through Supabase Realtime.
+- Open optimized routes in Google Maps, Apple Maps, or Waze.
+- Share weekly status and group invitations through WhatsApp.
+- Use cached read-only screens while temporarily offline.
+- Install the PWA and opt into per-device driver reminders.
 - Define tenant-scoped database tables and Row Level Security.
 - Authenticate rostered members with a phone number and shared group PIN.
 - Explain service limitations on the About page.
-
-The isolated Supabase schema, authentication layer, groups, and access rosters
-are provisioned. Event and ride-planning records are the next persistence
-surface.
 
 ## Run locally
 
@@ -68,14 +73,8 @@ npm run build
 
 ## Current limitations
 
-- Coordinates and meeting points are fictional.
-- Straight-line distance stands in for a road-time matrix provider.
-- Events, rider locations, driver offers, ride requests, and generated plans
-  are represented in the schema but are not yet wired into the interface.
-- Invitations, consent capture, route ordering, and driver acceptance are not
-  yet complete.
-- The shared-PIN flow requires roster provisioning and production-grade
-  brute-force protection before opening the app to untrusted traffic.
-- Suggestions are drafts, not ride commitments.
+- Route ordering uses geographic coordinates rather than live traffic times.
+- Apple Maps and Waze open multi-stop routes one destination at a time.
+- Offline mode is read-only until the device reconnects.
 - The About-page notice is not a substitute for attorney-reviewed Terms of
   Service, a Privacy Policy, or legally required consent language.

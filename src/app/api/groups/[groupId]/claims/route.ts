@@ -10,6 +10,7 @@ const claimSchema = z.object({
   eventId: z.string().uuid(),
   leg: z.enum(["to_event", "from_event"]),
   householdId: z.string().uuid().optional(),
+  driverRosterEntryId: z.string().uuid().optional(),
 });
 const releaseSchema = z.object({
   eventId: z.string().uuid(),
@@ -28,9 +29,30 @@ export async function POST(
       return Response.json({ error: "Invalid ride claim." }, { status: 400 });
     }
     const { admin, userId } = await requireActiveGroupMember(groupId);
-    const householdId =
-      input.data.householdId ??
-      (await currentHouseholdId(admin, groupId, userId));
+    // Picking a driver implies their household, so the claim still belongs to
+    // the family even when another member books it.
+    let householdId = input.data.householdId;
+    const driverRosterEntryId = input.data.driverRosterEntryId ?? null;
+    if (driverRosterEntryId) {
+      const { data: driver, error: driverError } = await admin
+        .from("group_access_roster")
+        .select("household_id")
+        .eq("group_id", groupId)
+        .eq("id", driverRosterEntryId)
+        .eq("active", true)
+        .maybeSingle();
+      if (driverError) throw driverError;
+      if (!driver?.household_id) {
+        return Response.json(
+          { error: "That driver is not available." },
+          { status: 404 },
+        );
+      }
+      householdId = driver.household_id as string;
+    }
+    if (!householdId) {
+      householdId = await currentHouseholdId(admin, groupId, userId);
+    }
     const [{ data: event, error: eventError }] = await Promise.all([
       admin
         .from("group_events")
@@ -60,6 +82,7 @@ export async function POST(
         event_id: input.data.eventId,
         leg: input.data.leg,
         household_id: householdId,
+        driver_roster_entry_id: driverRosterEntryId,
         claimed_by: userId,
       })
       .select("id")

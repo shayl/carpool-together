@@ -22,11 +22,12 @@ import {
   Pencil,
   Plus,
   Route,
+  Share2,
   Trash2,
   Users,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   groupResourceUrl,
@@ -40,13 +41,19 @@ import {
   requiredLegs,
   rideState,
 } from "@/lib/schedule-state";
+import { AddressInput, type AddressValue } from "@/components/address-input";
 import { MemberAvatar } from "@/components/member-avatar";
+import { Sheet } from "@/components/sheet";
 import {
   coverageMood,
   RideStatusCar,
 } from "@/components/ride-status-car";
 import {
   googleRouteUrl,
+  navigationProviderKey,
+  navigationTarget,
+  placeUrl,
+  savedNavigationProvider,
   singleStopUrl,
   type NavigationProvider,
 } from "@/lib/navigation-links";
@@ -58,6 +65,11 @@ import type {
   RideLeg,
 } from "@/lib/schedule-types";
 import { useI18n } from "@/lib/i18n";
+import type { AppRosterEntry } from "@/lib/app-data";
+import {
+  navigationStateFromSearchParams,
+  type NavigationState,
+} from "@/lib/navigation-state";
 
 type ScheduleView = "rides" | "family" | "team";
 
@@ -67,6 +79,11 @@ type Props = {
   canManage: boolean;
   view: ScheduleView;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
+  currentRosterEntryId?: string | null;
+  offline?: boolean;
+  initialNavigation: NavigationState;
+  onNavigate?: (view: ScheduleView) => void;
 };
 
 const eventTypes: EventType[] = ["practice", "game", "competition"];
@@ -109,7 +126,7 @@ export function ScheduleViews(props: Props) {
   return <TeamSchedule {...props} />;
 }
 
-function useMutation(groupId: string) {
+function useMutation(groupId: string, offline = false) {
   const router = useRouter();
   const { t } = useI18n();
   const [busyKey, setBusyKey] = useState("");
@@ -126,6 +143,9 @@ function useMutation(groupId: string) {
     setError("");
     setMessage("");
     try {
+      if (offline || !navigator.onLine) {
+        throw new Error(t("Reconnect to make changes."));
+      }
       const response = await fetch(groupResourceUrl(groupId, resource), {
           method,
           headers: { "Content-Type": "application/json" },
@@ -148,12 +168,21 @@ function useMutation(groupId: string) {
   return { busyKey, error, message, mutate };
 }
 
-function RidesSchedule({ groupId, groupName, schedule }: Props) {
+function RidesSchedule({
+  groupId,
+  groupName,
+  schedule,
+  roster,
+  offline,
+  initialNavigation,
+}: Props) {
   const { t, locale } = useI18n();
-  const mutation = useMutation(groupId);
-  const [display, setDisplay] = useState<"week" | "month">("week");
+  const mutation = useMutation(groupId, offline);
+  const [display, setDisplay] = useState<"week" | "month">(
+    initialNavigation.calendarDisplay,
+  );
   const [cursor, setCursor] = useState(() =>
-    startOfWeek(new Date(), { weekStartsOn: 1 }),
+    parseISO(initialNavigation.calendarDate),
   );
   const [filter, setFilter] = useState<"all" | "open" | "mine">("all");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -184,6 +213,25 @@ function RidesSchedule({ groupId, groupName, schedule }: Props) {
     requiredLegs(event).map((leg) => rideState(schedule, event, leg)),
   );
   const open = rides.filter((ride) => ride.open).length;
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", display);
+    url.searchParams.set("date", format(cursor, "yyyy-MM-dd"));
+    window.history.replaceState(null, "", url);
+  }, [cursor, display]);
+
+  useEffect(() => {
+    const restoreCalendar = () => {
+      const navigation = navigationStateFromSearchParams(
+        new URL(window.location.href).searchParams,
+      );
+      setDisplay(navigation.calendarDisplay);
+      setCursor(parseISO(navigation.calendarDate));
+    };
+    window.addEventListener("popstate", restoreCalendar);
+    return () => window.removeEventListener("popstate", restoreCalendar);
+  }, []);
 
   function move(direction: -1 | 1) {
     setCursor((current) =>
@@ -347,6 +395,7 @@ function RidesSchedule({ groupId, groupName, schedule }: Props) {
               key={event.id}
               event={event}
               schedule={schedule}
+              roster={roster}
               expanded={expanded === event.id}
               onToggle={() =>
                 setExpanded((current) => (current === event.id ? null : event.id))
@@ -433,12 +482,14 @@ function MonthGrid({
 function EventCard({
   event,
   schedule,
+  roster,
   expanded,
   onToggle,
   mutation,
 }: {
   event: GroupEvent;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
   expanded: boolean;
   onToggle: () => void;
   mutation: ReturnType<typeof useMutation>;
@@ -532,6 +583,7 @@ function EventCard({
               event={event}
               leg={leg}
               schedule={schedule}
+              roster={roster}
               mutation={mutation}
             />
           ))}
@@ -554,17 +606,29 @@ function RideLegPanel({
   event,
   leg,
   schedule,
+  roster,
   mutation,
 }: {
   event: GroupEvent;
   leg: RideLeg;
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
   mutation: ReturnType<typeof useMutation>;
 }) {
   const { t } = useI18n();
   const ride = rideState(schedule, event, leg);
-  const [householdId, setHouseholdId] = useState(
-    schedule.currentHouseholdId ?? schedule.households[0]?.id ?? "",
+  // Drivers are people, not households: every adult attached to a household
+  // can take a ride, and picking one implies their household.
+  const drivers = roster.filter(
+    (member) => member.active && member.householdId,
+  );
+  const [driverId, setDriverId] = useState(
+    () =>
+      drivers.find(
+        (member) => member.householdId === schedule.currentHouseholdId,
+      )?.id ??
+      drivers[0]?.id ??
+      "",
   );
   if (!ride.active) return null;
   const riderHouseholds = [
@@ -591,7 +655,11 @@ function RideLegPanel({
       {ride.claim ? (
         <div className="claim-row">
           <strong>
-            {ride.household?.name ?? t("Assigned family")}
+            {roster.find(
+              (member) => member.id === ride.claim?.driverRosterEntryId,
+            )?.displayName ??
+              ride.household?.name ??
+              t("Assigned family")}
           </strong>
           <button
             className="secondary-button"
@@ -613,25 +681,25 @@ function RideLegPanel({
         <div className="claim-row">
           <select
             className="input"
-            aria-label={t("Driving family")}
-            value={householdId}
-            onChange={(item) => setHouseholdId(item.target.value)}
+            aria-label={t("Driver")}
+            value={driverId}
+            onChange={(item) => setDriverId(item.target.value)}
           >
-            {schedule.households.map((household) => (
-              <option key={household.id} value={household.id}>
-                {household.name}
+            {drivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>
+                {driver.displayName}
               </option>
             ))}
           </select>
           <button
             className="primary-button"
             type="button"
-            disabled={!householdId || Boolean(mutation.busyKey)}
+            disabled={!driverId || Boolean(mutation.busyKey)}
             onClick={() =>
               mutation.mutate(
                 "claims",
                 "POST",
-                { eventId: event.id, leg, householdId },
+                { eventId: event.id, leg, driverRosterEntryId: driverId },
                 `claim-${event.id}-${leg}`,
               )
             }
@@ -646,7 +714,14 @@ function RideLegPanel({
       <div className="ride-address-list">
         {ride.household && (
           <address>
-            <strong>{t("Driver: {{name}}", { name: ride.household.name })}</strong>
+            <strong>
+              {t("Driver: {{name}}", {
+                name:
+                  roster.find(
+                    (member) => member.id === ride.claim?.driverRosterEntryId,
+                  )?.displayName ?? ride.household.name,
+              })}
+            </strong>
             <span>{ride.household.address || t("No address added")}</span>
           </address>
         )}
@@ -684,14 +759,6 @@ function RouteLauncher({
   >(null);
   const [nextStopIndex, setNextStopIndex] = useState(1);
 
-  function navigationTarget() {
-    const mobile =
-      window.matchMedia("(pointer: coarse)").matches ||
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    return mobile ? "_self" : "_blank";
-  }
-
   async function loadRoute() {
     const response = await fetch(`/api/groups/${groupId}/routes`, {
       method: "POST",
@@ -716,9 +783,7 @@ function RouteLauncher({
     setError("");
     try {
       if (!navigator.onLine) throw new Error(t("Reconnect to open a route."));
-      const preference = window.localStorage.getItem(
-        "carpool-navigation-provider",
-      );
+      const preference = window.localStorage.getItem(navigationProviderKey);
       const saved =
         preference === "google" ||
         preference === "apple" ||
@@ -746,7 +811,7 @@ function RouteLauncher({
   }
 
   function launchProvider(provider: NavigationProvider, stops: GeoStop[]) {
-    window.localStorage.setItem("carpool-navigation-provider", provider);
+    window.localStorage.setItem(navigationProviderKey, provider);
     setChoosing(false);
     if (provider === "google") {
       window.open(googleRouteUrl(stops), navigationTarget(), "noopener,noreferrer");
@@ -1039,152 +1104,215 @@ function ParticipantStatusEditor({
   );
 }
 
-function FamilySchedule({ groupId, schedule }: Props) {
+function FamilySchedule({
+  groupId,
+  schedule,
+  roster,
+  currentRosterEntryId,
+  offline,
+  onNavigate,
+  initialNavigation,
+}: Props) {
   const { t, locale } = useI18n();
-  const mutation = useMutation(groupId);
+  const router = useRouter();
+  const mutation = useMutation(groupId, offline);
   const household = schedule.households.find(
     (item) => item.id === schedule.currentHouseholdId,
   );
   const participants = schedule.participants.filter(
     (item) => item.householdId === household?.id,
   );
+  const drivers = roster.filter(
+    (member) => member.active && member.householdId === household?.id,
+  );
   const [showAbsence, setShowAbsence] = useState(false);
-  const [startsOn, setStartsOn] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [endsOn, setEndsOn] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [showPastAbsences, setShowPastAbsences] = useState(false);
+  const [editingAbsenceId, setEditingAbsenceId] = useState<string | null>(null);
+  const [showFamilyDetails, setShowFamilyDetails] = useState(false);
+  const [savingFamily, setSavingFamily] = useState(false);
+  const [familyError, setFamilyError] = useState("");
+  const familyEditButton = useRef<HTMLButtonElement>(null);
+  const [startsOn, setStartsOn] = useState(initialNavigation.currentDate);
+  const [endsOn, setEndsOn] = useState(initialNavigation.currentDate);
   const [selected, setSelected] = useState<string[]>(
     participants.map((item) => item.id),
   );
-  const [addressDraft, setAddressDraft] = useState({
-    householdId: household?.id ?? null,
-    value: household?.address ?? "",
-  });
-  const address =
-    addressDraft.householdId === household?.id
-      ? addressDraft.value
-      : (household?.address ?? "");
-  const futureEvents = schedule.events
+  const today = initialNavigation.currentDate;
+  const familyWeekStart = startOfWeek(parseISO(today), { weekStartsOn: 1 });
+  const familyWeekEnd = addDays(familyWeekStart, 6);
+  const familyEvents = schedule.events
     .filter(
       (event) =>
-        event.date >= format(new Date(), "yyyy-MM-dd") &&
+        event.date >= format(familyWeekStart, "yyyy-MM-dd") &&
+        event.date <= format(familyWeekEnd, "yyyy-MM-dd") &&
         !isEventInBreak(schedule, event),
-    )
-    .slice(0, 12);
+    );
+  const familyAbsences = [
+    ...schedule.absencePeriods
+      .filter((period) =>
+        participants.some((item) => item.id === period.participantId),
+      )
+      .reduce(
+        (groups, period) => {
+          const current = groups.get(period.periodGroupId);
+          if (current) {
+            current.participantIds.push(period.participantId);
+          } else {
+            groups.set(period.periodGroupId, {
+              periodGroupId: period.periodGroupId,
+              startsOn: period.startsOn,
+              endsOn: period.endsOn,
+              participantIds: [period.participantId],
+            });
+          }
+          return groups;
+        },
+        new Map<
+          string,
+          {
+            periodGroupId: string;
+            startsOn: string;
+            endsOn: string;
+            participantIds: string[];
+          }
+        >(),
+      )
+      .values(),
+  ].filter((period) => showPastAbsences || period.endsOn >= today);
+
+  async function saveFamilyDetails(input: FamilyDetailsInput) {
+    setSavingFamily(true);
+    setFamilyError("");
+    try {
+      if (offline || !navigator.onLine) {
+        throw new Error(t("Reconnect to make changes."));
+      }
+      const response = await fetch(
+        `/api/groups/${groupId}/households/family`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        },
+      );
+      await readResult(response);
+      setShowFamilyDetails(false);
+      router.refresh();
+      return true;
+    } catch (caught) {
+      setFamilyError(
+        caught instanceof Error ? t(caught.message) : t("Change failed."),
+      );
+      return false;
+    } finally {
+      setSavingFamily(false);
+    }
+  }
 
   return (
     <>
       <div className="screen-heading">
         <h1>{t("My family")}</h1>
-        <p>{household?.name ?? t("Your riders, your plans.")}</p>
+        <p>{t("Your riders, your plans.")}</p>
       </div>
       {household && (
-        <section className="surface-card">
-          <div className="card-heading">
-            <div>
-              <h2>{t("Home address")}</h2>
-              <p className="text-muted">
-                {t(
-                  "Used only to coordinate pickups and routes within your group.",
-                )}
-              </p>
+        <section className="surface-card family-overview-card">
+          <h2>{t("{{name}} family", { name: household.name })}</h2>
+          {participants.length === 0 && (
+            <div className="family-empty-state">
+              <Users size={24} />
+              <div>
+                <strong>{t("No riders in this family yet")}</strong>
+                <p>{t("Use Edit family details to add the first rider.")}</p>
+              </div>
             </div>
-          </div>
-          <form
-            className="schedule-form household-address-form"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              await mutation.mutate(
-                "households",
-                "PATCH",
-                { address, latitude: null, longitude: null },
-                "save-address",
-              );
-            }}
-          >
-            <label>
-              {t("Address")}
-              <input
-                className="input"
-                type="text"
-                autoComplete="street-address"
-                maxLength={300}
-                required
-                value={address}
-                onChange={(input) =>
-                  setAddressDraft({
-                    householdId: household.id,
-                    value: input.target.value,
-                  })
-                }
-                placeholder={t("123 Main St, City")}
+          )}
+          {participants.map((participant) => (
+            <div className="family-rider" key={participant.id}>
+              <MemberAvatar
+                name={participant.name}
+                photoUrl={participant.photoUrl}
+                size={48}
               />
-            </label>
-            <button
-              className="primary-button"
-              disabled={
-                mutation.busyKey === "save-address" ||
-                !address.trim() ||
-                address.trim() === household.address
-              }
-            >
-              {mutation.busyKey === "save-address"
-                ? t("Saving…")
-                : t("Save address")}
-            </button>
-          </form>
+              <div className="family-rider-content">
+                <h3>{participant.name}</h3>
+                <p className="text-muted">
+                  {t("Week of {{date}}", {
+                    date: displayDate(familyWeekStart, "MMM d", locale),
+                  })}
+                </p>
+                <div className="family-event-list">
+                  {familyEvents.map((event) => {
+                    const attendance = effectiveAttendance(
+                      schedule,
+                      event,
+                      participant,
+                    );
+                    const needed = requiredLegs(event).filter((leg) =>
+                      leg === "to_event"
+                        ? !attendance.optOutTo
+                        : !attendance.optOutFrom,
+                    );
+                    const open = needed.filter(
+                      (leg) => rideState(schedule, event, leg).open,
+                    ).length;
+                    return (
+                      <div className="family-event-row" key={event.id}>
+                        <time dateTime={event.date}>
+                          {displayDate(
+                            parseISO(event.date),
+                            "EEE, MMM d",
+                            locale,
+                          )}
+                        </time>
+                        <strong>{t(eventTitle(event))}</strong>
+                        <span>
+                          {attendance.absent
+                            ? t("Not attending")
+                            : open
+                              ? t("{{count}} rides need a driver", {
+                                  count: open,
+                                })
+                              : needed.length
+                                ? t("Covered")
+                                : t("No rides needed")}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  className="text-button family-rides-link"
+                  type="button"
+                  onClick={() => onNavigate?.("rides")}
+                >
+                  {t("Change a daily ride")}
+                </button>
+              </div>
+            </div>
+          ))}
         </section>
       )}
-      <section className="surface-card">
-        <h2>{t("Upcoming ride status")}</h2>
-        {participants.map((participant) => (
-          <div className="family-schedule" key={participant.id}>
-            <h3>{participant.name}</h3>
-            {futureEvents.map((event) => {
-              const attendance = effectiveAttendance(
-                schedule,
-                event,
-                participant,
-              );
-              const needed = requiredLegs(event).filter((leg) =>
-                leg === "to_event"
-                  ? !attendance.optOutTo
-                  : !attendance.optOutFrom,
-              );
-              const open = needed.filter(
-                (leg) => rideState(schedule, event, leg).open,
-              ).length;
-              return (
-                <div className="family-event-row" key={event.id}>
-                  <time dateTime={event.date}>
-                    {displayDate(parseISO(event.date), "EEE, MMM d", locale)}
-                  </time>
-                  <strong>{t(eventTitle(event))}</strong>
-                  <span>
-                    {attendance.absent
-                      ? t("Not attending")
-                      : open
-                        ? t("{{count}} rides need a driver", { count: open })
-                        : needed.length
-                          ? t("Covered")
-                          : t("No rides needed")}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </section>
-      <section className="surface-card">
-        <div className="card-heading">
-          <div>
-            <h2>{t("Multi-day absences")}</h2>
-            <p className="text-muted">
-              {t("Apply an absence to several events at once.")}
-            </p>
-          </div>
+      <section className="surface-card family-section family-absence-card">
+        <div>
+          <h2>{t("Rider absences")}</h2>
+          <p className="text-muted">
+            {t(
+              "Applies to scheduled events. Only your family can change these dates.",
+            )}
+          </p>
+        </div>
+        <div>
           <button
             className="secondary-button"
             type="button"
-            onClick={() => setShowAbsence((value) => !value)}
+            onClick={() => {
+              setEditingAbsenceId(null);
+              setSelected(participants.map((participant) => participant.id));
+              setStartsOn(today);
+              setEndsOn(today);
+              setShowAbsence((value) => !value);
+            }}
           >
             <Plus size={18} />
             {t("Add absence")}
@@ -1197,11 +1325,21 @@ function FamilySchedule({ groupId, schedule }: Props) {
               event.preventDefault();
               const saved = await mutation.mutate(
                 "absences",
-                "POST",
-                { startsOn, endsOn, participantIds: selected },
+                editingAbsenceId ? "PATCH" : "POST",
+                {
+                  startsOn,
+                  endsOn,
+                  participantIds: selected,
+                  ...(editingAbsenceId && {
+                    periodGroupId: editingAbsenceId,
+                  }),
+                },
                 "add-absence",
               );
-              if (saved) setShowAbsence(false);
+              if (saved) {
+                setShowAbsence(false);
+                setEditingAbsenceId(null);
+              }
             }}
           >
             <div className="participant-pills">
@@ -1251,53 +1389,364 @@ function FamilySchedule({ groupId, schedule }: Props) {
             </button>
           </form>
         )}
-        {schedule.absencePeriods
-          .filter((period) =>
-            participants.some((item) => item.id === period.participantId),
-          )
-          .map((period) => (
-            <div className="period-row" key={period.id}>
+        {familyAbsences.map((period) => (
+            <div className="period-row" key={period.periodGroupId}>
               <span>
-                {
-                  schedule.participants.find(
-                    (item) => item.id === period.participantId,
-                  )?.name
-                }
+                {participants
+                  .filter((participant) =>
+                    period.participantIds.includes(participant.id),
+                  )
+                  .map((participant) => participant.name)
+                  .join(", ")}
               </span>
               <span>
                 {period.startsOn} – {period.endsOn}
               </span>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() =>
-                  mutation.mutate(
-                    "absences",
-                    "DELETE",
-                    { periodGroupId: period.periodGroupId },
-                    `absence-${period.periodGroupId}`,
-                  )
-                }
-              >
-                {t("Remove")}
-              </button>
+              <span className="row-actions">
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => {
+                    setEditingAbsenceId(period.periodGroupId);
+                    setSelected(period.participantIds);
+                    setStartsOn(period.startsOn);
+                    setEndsOn(period.endsOn);
+                    setShowAbsence(true);
+                  }}
+                >
+                  {t("Edit")}
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() =>
+                    mutation.mutate(
+                      "absences",
+                      "DELETE",
+                      { periodGroupId: period.periodGroupId },
+                      `absence-${period.periodGroupId}`,
+                    )
+                  }
+                >
+                  {t("Remove")}
+                </button>
+              </span>
             </div>
           ))}
+        <button
+          className="text-button family-past-toggle"
+          type="button"
+          onClick={() => setShowPastAbsences((value) => !value)}
+        >
+          {t(showPastAbsences ? "Hide past dates" : "Show past dates")}
+        </button>
       </section>
+      {household && (
+        <section className="surface-card family-section family-details-card">
+          <div>
+            <h2>{t("Family details")}</h2>
+            <p className="text-muted">{household.address}</p>
+          </div>
+          <button
+            ref={familyEditButton}
+            className="text-button family-details-toggle"
+            type="button"
+            onClick={() => {
+              setFamilyError("");
+              setShowFamilyDetails(true);
+            }}
+          >
+            {t("Edit family details")}
+          </button>
+          {showFamilyDetails && (
+            <Sheet
+              title={t("Edit family details")}
+              busy={savingFamily}
+              returnFocus={familyEditButton}
+              onClose={() => setShowFamilyDetails(false)}
+            >
+              <FamilyEditForm
+                household={household}
+                guardians={drivers}
+                riders={participants}
+                currentRosterEntryId={currentRosterEntryId}
+                busy={savingFamily}
+                error={familyError}
+                onSubmit={saveFamilyDetails}
+              />
+            </Sheet>
+          )}
+        </section>
+      )}
       {mutation.error && <p className="auth-error">{mutation.error}</p>}
       {mutation.message && <p className="auth-message">{mutation.message}</p>}
     </>
   );
 }
 
-function TeamSchedule({ groupId, canManage, schedule }: Props) {
+type FamilyDetailsInput = {
+  householdId: string;
+  name: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  guardians: Array<{ id?: string; name: string; phone: string }>;
+  riders: Array<{ id?: string; name: string }>;
+};
+
+function FamilyEditForm({
+  household,
+  guardians: initialGuardians,
+  riders: initialRiders,
+  currentRosterEntryId,
+  busy,
+  error,
+  onSubmit,
+}: {
+  household: GroupSchedule["households"][number];
+  guardians: AppRosterEntry[];
+  riders: GroupSchedule["participants"];
+  currentRosterEntryId?: string | null;
+  busy: boolean;
+  error: string;
+  onSubmit: (input: FamilyDetailsInput) => Promise<boolean>;
+}) {
   const { t } = useI18n();
-  const mutation = useMutation(groupId);
+  const [name, setName] = useState(household.name);
+  const [address, setAddress] = useState<AddressValue>({
+    address: household.address,
+    latitude: household.latitude,
+    longitude: household.longitude,
+  });
+  const [guardians, setGuardians] = useState<
+    Array<{ id?: string; name: string; phone: string }>
+  >(() =>
+    initialGuardians.map((guardian) => ({
+      id: guardian.id,
+      name: guardian.displayName,
+      phone: guardian.phone ?? "",
+    })),
+  );
+  const [riders, setRiders] = useState<
+    Array<{ id?: string; name: string }>
+  >(() =>
+    initialRiders.map((rider) => ({ id: rider.id, name: rider.name })),
+  );
+
+  return (
+    <form
+      className="family-edit-form"
+      onChangeCapture={(event) => {
+        event.currentTarget.dataset.dirty = "true";
+      }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void onSubmit({
+          householdId: household.id,
+          name,
+          address: address.address,
+          latitude: address.latitude,
+          longitude: address.longitude,
+          guardians,
+          riders,
+        });
+      }}
+    >
+      <div className="family-edit-basics">
+        <label>
+          <span>{t("Family name")}</span>
+          <input
+            className="input"
+            required
+            maxLength={100}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={t("Family name")}
+          />
+        </label>
+        <AddressInput
+          label={t("Address")}
+          required
+          value={address}
+          onChange={setAddress}
+          placeholder={t("123 Main St, City")}
+        />
+      </div>
+
+      <div className="family-edit-members">
+        {guardians.map((guardian, index) => {
+          const protectedGuardian =
+            guardian.id === currentRosterEntryId ||
+            guardian.id === household.rosterEntryId;
+          return (
+            <div
+              className="family-edit-member-row"
+              key={guardian.id ?? `guardian-${index}`}
+            >
+              <label>
+                <span>{t("Parent / guardian")}</span>
+                <input
+                  className="input"
+                  required
+                  maxLength={100}
+                  value={guardian.name}
+                  onChange={(event) =>
+                    setGuardians((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, name: event.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                <span>{t("Phone")}</span>
+                <input
+                  className="input"
+                  required
+                  inputMode="tel"
+                  value={guardian.phone}
+                  onChange={(event) =>
+                    setGuardians((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, phone: event.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <button
+                className="family-remove-button"
+                type="button"
+                disabled={protectedGuardian}
+                title={
+                  protectedGuardian
+                    ? t("This guardian is required for your active account.")
+                    : t("Remove guardian")
+                }
+                onClick={() =>
+                  setGuardians((current) =>
+                    current.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              >
+                {t("Remove")}
+              </button>
+            </div>
+          );
+        })}
+        {riders.map((rider, index) => (
+          <div
+            className="family-edit-member-row family-edit-rider-row"
+            key={rider.id ?? `rider-${index}`}
+          >
+            <label>
+              <span>{t("Rider")}</span>
+              <input
+                className="input"
+                required
+                maxLength={100}
+                value={rider.name}
+                onChange={(event) =>
+                  setRiders((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index
+                        ? { ...item, name: event.target.value }
+                        : item,
+                    ),
+                  )
+                }
+              />
+            </label>
+            <button
+              className="family-remove-button"
+              type="button"
+              onClick={() =>
+                setRiders((current) =>
+                  current.filter((_, itemIndex) => itemIndex !== index),
+                )
+              }
+            >
+              {t("Remove")}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="family-add-actions">
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() =>
+            setGuardians((current) => [
+              ...current,
+              { name: "", phone: "" },
+            ])
+          }
+        >
+          {t("+ Guardian")}
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() =>
+            setRiders((current) => [...current, { name: "" }])
+          }
+        >
+          {t("+ Rider")}
+        </button>
+      </div>
+      <button
+        className="primary-button family-save-button"
+        disabled={busy || !guardians.length || !riders.length}
+      >
+        {busy ? t("Saving…") : t("Save family changes")}
+      </button>
+      {error && <p className="auth-error">{error}</p>}
+    </form>
+  );
+}
+
+function TeamSchedule({
+  groupId,
+  canManage,
+  schedule,
+  offline,
+  initialNavigation,
+}: Props) {
+  const { t } = useI18n();
+  const mutation = useMutation(groupId, offline);
   const [panel, setPanel] = useState<
     "event" | "recurring" | "venue" | "break" | null
   >(null);
   const [editingEvent, setEditingEvent] = useState<GroupEvent | null>(null);
+  const [editingBreak, setEditingBreak] = useState<
+    GroupSchedule["breaks"][number] | null
+  >(null);
+  const [shareLink, setShareLink] = useState("");
+  const [importToken, setImportToken] = useState(initialNavigation.venueToken);
   const counts = driveCounts(schedule);
+
+  async function shareVenue(locationId: string) {
+    setShareLink("");
+    const response = await fetch(`/api/groups/${groupId}/venue-shares`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locationId }),
+    });
+    const result = (await response.json().catch(() => null)) as {
+      token?: string;
+    } | null;
+    if (!response.ok || !result?.token) return false;
+    const link = `${window.location.origin}/?venue=${result.token}`;
+    await navigator.clipboard?.writeText(link).catch(() => undefined);
+    setShareLink(link);
+    return true;
+  }
 
   return (
     <>
@@ -1346,6 +1795,7 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
           </div>
           {panel === "event" && (
             <EventForm
+              groupId={groupId}
               schedule={schedule}
               event={editingEvent}
               busy={Boolean(mutation.busyKey)}
@@ -1444,6 +1894,88 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
       <section className="surface-card">
         <div className="card-heading">
           <div>
+            <h2>{t("Venues")}</h2>
+            <p className="text-muted">
+              {t("Places your events meet. Open one to see it on a map.")}
+            </p>
+          </div>
+          <MapPin size={22} />
+        </div>
+        {schedule.locations.length === 0 ? (
+          <p className="text-muted">{t("No venues yet.")}</p>
+        ) : (
+          <div className="household-address-list">
+            {schedule.locations.map((location) => (
+              <VenueRow
+                key={location.id}
+                location={location}
+                canManage={canManage}
+                busy={Boolean(mutation.busyKey)}
+                onShare={() => shareVenue(location.id)}
+                onSave={(name, next) =>
+                  mutation.mutate(
+                    "locations",
+                    "PATCH",
+                    { locationId: location.id, name, ...next },
+                    `venue-${location.id}`,
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+        {shareLink && (
+          <p className="auth-message share-link">
+            {t("Share link copied.")} <code>{shareLink}</code>
+          </p>
+        )}
+        {canManage && (
+          <form
+            className="schedule-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              // Accept a full link or a bare token.
+              const token = importToken.trim().split("venue=").at(-1)?.trim();
+              const saved = await mutation.mutate(
+                "venue-shares",
+                "PUT",
+                { token },
+                "import-venue",
+              );
+              if (saved) setImportToken("");
+            }}
+          >
+            <label>
+              {t("Add a venue shared with you")}
+              <input
+                className="input"
+                value={importToken}
+                onChange={(input) => setImportToken(input.target.value)}
+                placeholder={t("Paste a venue share link")}
+              />
+            </label>
+            <button
+              className="secondary-button"
+              disabled={
+                mutation.busyKey === "import-venue" || !importToken.trim()
+              }
+            >
+              {mutation.busyKey === "import-venue"
+                ? t("Adding…")
+                : t("Add shared venue")}
+            </button>
+            <p className="auth-footnote">
+              {t(
+                "You get your own copy to edit. Adding the same link again restores the original details.",
+              )}
+            </p>
+          </form>
+        )}
+      </section>
+
+      <section className="surface-card">
+        <div className="card-heading">
+          <div>
             <h2>{t("Group breaks")}</h2>
             <p className="text-muted">
               {t(
@@ -1454,7 +1986,10 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
           <button
             className="secondary-button"
             type="button"
-            onClick={() => setPanel(panel === "break" ? null : "break")}
+            onClick={() => {
+              setEditingBreak(null);
+              setPanel(panel === "break" ? null : "break");
+            }}
           >
             <Plus size={18} />
             {t("Add break")}
@@ -1462,16 +1997,24 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
         </div>
         {panel === "break" && (
           <BreakForm
+            key={editingBreak?.id ?? "new-break"}
+            period={editingBreak}
             busy={Boolean(mutation.busyKey)}
-            onCancel={() => setPanel(null)}
+            onCancel={() => {
+              setPanel(null);
+              setEditingBreak(null);
+            }}
             onSave={async (body) => {
               const saved = await mutation.mutate(
                 "breaks",
-                "POST",
-                body,
+                editingBreak ? "PATCH" : "POST",
+                editingBreak ? { ...body, id: editingBreak.id } : body,
                 "save-break",
               );
-              if (saved) setPanel(null);
+              if (saved) {
+                setPanel(null);
+                setEditingBreak(null);
+              }
             }}
           />
         )}
@@ -1483,20 +2026,32 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
                 {period.startsOn} – {period.endsOn}
               </small>
             </span>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() =>
-                mutation.mutate(
-                  "breaks",
-                  "DELETE",
-                  { id: period.id },
-                  `break-${period.id}`,
-                )
-              }
-            >
-              {t("Remove")}
-            </button>
+            <span className="row-actions">
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => {
+                  setEditingBreak(period);
+                  setPanel("break");
+                }}
+              >
+                {t("Edit")}
+              </button>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() =>
+                  mutation.mutate(
+                    "breaks",
+                    "DELETE",
+                    { id: period.id },
+                    `break-${period.id}`,
+                  )
+                }
+              >
+                {t("Remove")}
+              </button>
+            </span>
           </div>
         ))}
       </section>
@@ -1518,16 +2073,11 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
               household={household}
               canManage={canManage}
               busy={Boolean(mutation.busyKey)}
-              onSave={(address) =>
+              onSave={(next) =>
                 mutation.mutate(
                   "households",
                   "PATCH",
-                  {
-                    householdId: household.id,
-                    address,
-                    latitude: null,
-                    longitude: null,
-                  },
+                  { householdId: household.id, ...next },
                   `household-${household.id}`,
                 )
               }
@@ -1559,6 +2109,132 @@ function TeamSchedule({ groupId, canManage, schedule }: Props) {
   );
 }
 
+function VenueRow({
+  location,
+  canManage,
+  busy,
+  onShare,
+  onSave,
+}: {
+  location: GroupSchedule["locations"][number];
+  canManage: boolean;
+  busy: boolean;
+  onShare: () => Promise<boolean>;
+  onSave: (name: string, location: AddressValue) => Promise<boolean>;
+}) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [name, setName] = useState(location.name);
+  const [draft, setDraft] = useState<AddressValue>({
+    address: location.address,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  });
+
+  function openInMaps() {
+    const provider = savedNavigationProvider(
+      window.localStorage.getItem(navigationProviderKey),
+    );
+    window.open(
+      placeUrl(provider, {
+        label: location.name,
+        address: location.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      }),
+      navigationTarget(),
+      "noopener,noreferrer",
+    );
+  }
+
+  if (editing) {
+    return (
+      <form
+        className="household-address-editor"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (await onSave(name, draft)) setEditing(false);
+        }}
+      >
+        <input
+          className="input"
+          required
+          maxLength={160}
+          value={name}
+          aria-label={t("Venue name")}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <AddressInput
+          mapKind="venue"
+          required
+          value={draft}
+          onChange={setDraft}
+          ariaLabel={t("Address for {{name}}", { name: location.name })}
+        />
+        <button className="primary-button" disabled={busy}>
+          {t("Save")}
+        </button>
+        <button
+          className="text-button"
+          type="button"
+          onClick={() => {
+            setName(location.name);
+            setDraft({
+              address: location.address,
+              latitude: location.latitude,
+              longitude: location.longitude,
+            });
+            setEditing(false);
+          }}
+        >
+          {t("Cancel")}
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="household-address-row">
+      <div>
+        <strong>{location.name}</strong>
+        <address>{location.address}</address>
+      </div>
+      <span className="row-actions">
+        <button className="text-button" type="button" onClick={openInMaps}>
+          <MapPin size={16} />
+          {t("Open in maps")}
+        </button>
+        {canManage && (
+          <>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil size={16} />
+              {t("Edit")}
+            </button>
+            <button
+              className="text-button"
+              type="button"
+              disabled={sharing}
+              onClick={async () => {
+                setSharing(true);
+                await onShare();
+                setSharing(false);
+              }}
+            >
+              <Share2 size={16} />
+              {sharing ? t("Sharing…") : t("Share")}
+            </button>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
 function HouseholdAddressRow({
   household,
   canManage,
@@ -1568,11 +2244,15 @@ function HouseholdAddressRow({
   household: GroupSchedule["households"][number];
   canManage: boolean;
   busy: boolean;
-  onSave: (address: string) => Promise<boolean>;
+  onSave: (location: AddressValue) => Promise<boolean>;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
-  const [address, setAddress] = useState(household.address);
+  const [draft, setDraft] = useState<AddressValue>({
+    address: household.address,
+    latitude: household.latitude,
+    longitude: household.longitude,
+  });
 
   return (
     <div className="household-address-row">
@@ -1586,18 +2266,16 @@ function HouseholdAddressRow({
             className="household-address-editor"
             onSubmit={async (event) => {
               event.preventDefault();
-              if (await onSave(address)) setEditing(false);
+              if (await onSave(draft)) setEditing(false);
             }}
           >
-            <input
-              className="input"
+            <AddressInput
               required
-              maxLength={300}
-              value={address}
-              aria-label={t("Address for {{name}}", {
+              value={draft}
+              onChange={setDraft}
+              ariaLabel={t("Address for {{name}}", {
                 name: household.name,
               })}
-              onChange={(event) => setAddress(event.target.value)}
             />
             <button className="primary-button" disabled={busy}>
               {t("Save")}
@@ -1606,7 +2284,11 @@ function HouseholdAddressRow({
               className="text-button"
               type="button"
               onClick={() => {
-                setAddress(household.address);
+                setDraft({
+                  address: household.address,
+                  latitude: household.latitude,
+                  longitude: household.longitude,
+                });
                 setEditing(false);
               }}
             >
@@ -1639,12 +2321,14 @@ type EventFields = {
 };
 
 function EventForm({
+  groupId,
   schedule,
   event,
   busy,
   onCancel,
   onSave,
 }: {
+  groupId: string;
   schedule: GroupSchedule;
   event: GroupEvent | null;
   busy: boolean;
@@ -1666,10 +2350,57 @@ function EventForm({
   const [title, setTitle] = useState(event?.title ?? "");
   const [needsTo, setNeedsTo] = useState(event?.needsTo ?? false);
   const [needsFrom, setNeedsFrom] = useState(event?.needsFrom ?? true);
+  const [locations, setLocations] = useState(schedule.locations);
+  const [addingVenue, setAddingVenue] = useState(false);
+  const [venueBusy, setVenueBusy] = useState(false);
+  const [venueError, setVenueError] = useState("");
+  const venueTrigger = useRef<HTMLButtonElement>(null);
+
+  async function saveVenue(body: Record<string, unknown>) {
+    setVenueBusy(true);
+    setVenueError("");
+    try {
+      if (!navigator.onLine) throw new Error(t("Reconnect to make changes."));
+      const response = await fetch(`/api/groups/${groupId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        id?: string;
+        error?: string;
+      } | null;
+      if (!response.ok || !result?.id) {
+        throw new Error(result?.error ?? t("Could not add the venue."));
+      }
+      const location = {
+        id: result.id,
+        groupId,
+        name: String(body.name),
+        address: String(body.address),
+        latitude:
+          typeof body.latitude === "number" ? body.latitude : null,
+        longitude:
+          typeof body.longitude === "number" ? body.longitude : null,
+      };
+      setLocations((current) => [...current, location]);
+      setLocationId(location.id);
+      setAddingVenue(false);
+    } catch (caught) {
+      setVenueError(
+        caught instanceof Error
+          ? t(caught.message)
+          : t("Could not add the venue."),
+      );
+    } finally {
+      setVenueBusy(false);
+    }
+  }
 
   return (
-    <form
-      className="schedule-form"
+    <>
+      <form
+        className="schedule-form"
       onSubmit={(formEvent) => {
         formEvent.preventDefault();
         onSave({
@@ -1689,7 +2420,14 @@ function EventForm({
         <select
           className="input"
           value={eventType}
-          onChange={(input) => setEventType(input.target.value as EventType)}
+          onChange={(input) => {
+            const nextType = input.target.value as EventType;
+            setEventType(nextType);
+            if (!event && nextType !== "practice") {
+              setNeedsTo(true);
+              setNeedsFrom(true);
+            }
+          }}
         >
           {eventTypes.map((type) => (
             <option key={type} value={type}>
@@ -1746,12 +2484,24 @@ function EventForm({
           onChange={(input) => setLocationId(input.target.value)}
         >
           <option value="">{t("Choose a venue")}</option>
-          {schedule.locations.map((location) => (
+          {locations.map((location) => (
             <option key={location.id} value={location.id}>
               {location.name}
             </option>
           ))}
         </select>
+        <button
+          ref={venueTrigger}
+          className="text-button inline-add-venue"
+          type="button"
+          onClick={() => {
+            setVenueError("");
+            setAddingVenue(true);
+          }}
+        >
+          <Plus size={16} />
+          {t("Add venue")}
+        </button>
       </label>
       <label className="checkbox-row">
         <input
@@ -1769,8 +2519,24 @@ function EventForm({
         />
         {t("Ride home")}
       </label>
-      <FormActions busy={busy} onCancel={onCancel} />
-    </form>
+        <FormActions busy={busy} onCancel={onCancel} />
+      </form>
+      {addingVenue && (
+        <Sheet
+          title={t("Add venue")}
+          busy={venueBusy}
+          returnFocus={venueTrigger}
+          onClose={() => setAddingVenue(false)}
+        >
+          <VenueForm
+            busy={venueBusy}
+            onCancel={() => setAddingVenue(false)}
+            onSave={(body) => void saveVenue(body)}
+          />
+          {venueError && <p className="auth-error">{venueError}</p>}
+        </Sheet>
+      )}
+    </>
   );
 }
 
@@ -1937,13 +2703,17 @@ function VenueForm({
 }) {
   const { t } = useI18n();
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const [location, setLocation] = useState<AddressValue>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
   return (
     <form
       className="schedule-form"
       onSubmit={(event) => {
         event.preventDefault();
-        onSave({ name, address, latitude: null, longitude: null });
+        onSave({ name, ...location });
       }}
     >
       <label>
@@ -1955,34 +2725,38 @@ function VenueForm({
           onChange={(input) => setName(input.target.value)}
         />
       </label>
-      <label>
-        {t("Address")}
-        <input
-          className="input"
-          required
-          minLength={5}
-          value={address}
-          onChange={(input) => setAddress(input.target.value)}
-        />
-      </label>
+      <AddressInput
+        mapKind="venue"
+        label={t("Address")}
+        required
+        value={location}
+        onChange={setLocation}
+        placeholder={t("Start typing an address")}
+      />
       <FormActions busy={busy} onCancel={onCancel} />
     </form>
   );
 }
 
 function BreakForm({
+  period,
   busy,
   onCancel,
   onSave,
 }: {
+  period?: GroupSchedule["breaks"][number] | null;
   busy: boolean;
   onCancel: () => void;
   onSave: (body: Record<string, unknown>) => void;
 }) {
   const { t } = useI18n();
-  const [label, setLabel] = useState("");
-  const [startsOn, setStartsOn] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [endsOn, setEndsOn] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [label, setLabel] = useState(period?.label ?? "");
+  const [startsOn, setStartsOn] = useState(
+    period?.startsOn ?? format(new Date(), "yyyy-MM-dd"),
+  );
+  const [endsOn, setEndsOn] = useState(
+    period?.endsOn ?? format(new Date(), "yyyy-MM-dd"),
+  );
   return (
     <form
       className="schedule-form"

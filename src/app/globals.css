@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
   --background: #faf9fc;
@@ -527,6 +528,19 @@ button:disabled {
 
 .surface-card {
   padding: 20px;
+}
+
+.surface-card + .surface-card {
+  margin-top: 16px;
+}
+
+.surface-card h2 {
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.surface-card h3 {
+  font-weight: 700;
 }
 
 .weekly-events-card {
@@ -1168,6 +1182,65 @@ button:disabled {
   flex: 1 1 240px;
 }
 
+.address-input {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+/* The address needs the full row: truncating it to a narrow box hides the
+   part of the address that distinguishes one suggestion from another. */
+.household-address-editor .address-input {
+  flex: 1 1 100%;
+}
+
+.address-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  inset-inline: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 12%);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.address-suggestions ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.address-suggestions-credit {
+  margin: 4px 0 0;
+  padding: 4px 10px 2px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: start;
+}
+
+.address-suggestion {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: start;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.address-suggestion:hover,
+.address-suggestion-active {
+  background: rgb(15 23 42 / 6%);
+}
+
 .schedule-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1199,15 +1272,366 @@ button:disabled {
   grid-column: auto;
 }
 
-.family-schedule {
+.family-overview-card > h2 {
+  margin-bottom: 18px;
+  font-size: 18px;
+}
+
+.family-section {
   margin-top: 16px;
 }
 
-.family-schedule h3 {
-  margin-bottom: 8px;
+.offline-notice {
+  margin: 0 0 16px;
 }
 
-.family-event-row,
+.family-rider {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.family-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 14px;
+  background: #faf9fc;
+  padding: 16px;
+  color: var(--muted);
+}
+
+.family-empty-state svg {
+  flex: 0 0 auto;
+  color: var(--team);
+}
+
+.family-empty-state strong {
+  color: var(--foreground);
+}
+
+.family-empty-state p {
+  margin: 3px 0 0;
+  font-size: 13px;
+}
+
+.family-rider + .family-rider {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.family-rider-content {
+  min-width: 0;
+}
+
+.family-rider-content h3 {
+  margin: 0;
+}
+
+.family-rider-content > p {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.family-rides-link {
+  margin-top: 14px;
+  margin-inline-start: -8px;
+}
+
+.family-event-list {
+  display: grid;
+  grid-template-columns: 100px minmax(100px, max-content) minmax(0, 1fr);
+  column-gap: 16px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.family-event-row {
+  display: contents;
+}
+
+.family-event-row > * {
+  overflow-wrap: anywhere;
+  padding-block: 3px;
+}
+
+.family-event-row > span:last-child {
+  font-weight: 550;
+}
+
+.family-details-card {
+  display: grid;
+  gap: 8px;
+}
+
+.family-absence-card {
+  display: grid;
+  gap: 18px;
+}
+
+.family-absence-card h2,
+.family-absence-card p,
+.family-details-card h2,
+.family-details-card p {
+  margin: 0;
+}
+
+.family-absence-card h2,
+.family-details-card h2 {
+  font-size: 18px;
+}
+
+.family-absence-card p,
+.family-details-card p {
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.family-past-toggle {
+  justify-self: start;
+  margin-inline-start: -8px;
+}
+
+.family-details-toggle {
+  justify-self: start;
+  margin-inline-start: -8px;
+}
+
+.app-sheet {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 540px;
+  max-height: calc(100dvh - 24px);
+  margin: 0 auto;
+  border: 0;
+  border-radius: 24px 24px 0 0;
+  background: white;
+  padding: 0;
+  color: var(--foreground);
+  box-shadow: 0 -10px 50px #25203320;
+}
+
+.app-sheet[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-sheet-full {
+  inset: 0;
+  max-width: none;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+}
+
+.app-sheet-full .sheet-content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 0;
+}
+
+.app-sheet::backdrop {
+  background: #20192b70;
+  backdrop-filter: blur(2px);
+}
+
+.sheet-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px 12px;
+}
+
+.sheet-heading h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.sheet-content {
+  overflow-y: auto;
+  padding: 20px 20px max(24px, env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+
+.address-map-trigger {
+  width: 100%;
+}
+
+.map-picker {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.map-picker-instructions {
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.map-picker-canvas {
+  position: relative;
+  min-height: 280px;
+  flex: 1;
+}
+
+.map-picker-map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-current-location {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 999px;
+  background: white;
+  color: var(--team);
+  box-shadow: 0 4px 18px #25203330;
+}
+
+.map-picker-footer {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.map-picker-footer > p {
+  min-height: 20px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.map-picker-footer .primary-button {
+  width: 100%;
+}
+
+.map-pin-marker {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  transform: rotate(45deg);
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 0;
+  background: var(--team);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 30%);
+}
+
+.map-pin-marker span {
+  position: absolute;
+  inset: 9px;
+  border-radius: 999px;
+  background: white;
+}
+
+.leaflet-container {
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+.family-edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.family-edit-basics {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.family-edit-basics > label {
+  align-self: start;
+}
+
+.family-edit-members {
+  display: grid;
+  gap: 8px;
+}
+
+.family-edit-member-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  border-radius: 12px;
+  background: white;
+  padding: 12px 0;
+}
+
+.family-edit-member-row label {
+  display: grid;
+  gap: 6px;
+}
+
+.family-edit-member-row label > span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.family-edit-rider-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.family-remove-button {
+  align-self: end;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.family-remove-button:disabled {
+  color: #cbd5e1;
+}
+
+.family-add-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.family-save-button {
+  width: 100%;
+}
+
+.inline-add-venue {
+  justify-self: start;
+  margin-inline-start: -8px;
+}
+
+.family-details-section > h3 {
+  margin-bottom: 4px;
+}
+
+.family-details-section > p {
+  margin: 0;
+}
+
 .period-row,
 .drive-count-row {
   display: grid;
@@ -1261,12 +1685,19 @@ button:disabled {
     grid-column: 1;
   }
 
+  .family-event-list {
+    display: block;
+  }
+
   .family-event-row {
-    grid-template-columns: 90px 1fr;
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    column-gap: 8px;
+    margin-top: 6px;
   }
 
   .family-event-row > span:last-child {
-    grid-column: 1 / -1;
+    grid-column: 2;
   }
 
   .month-day {
@@ -1475,6 +1906,7 @@ button:disabled {
 .card-heading h2 {
   margin: 0;
   font-size: 17px;
+  font-weight: 750;
 }
 
 .card-heading span {
@@ -1713,6 +2145,20 @@ button:disabled {
 }
 
 @media (min-width: 640px) {
+  .app-sheet {
+    inset: 0;
+    height: fit-content;
+    margin: auto;
+    border-radius: 24px;
+  }
+
+  .app-sheet-full {
+    inset: 0;
+    max-width: none;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
   .app-navigation {
     position: sticky;
     top: 0;
@@ -1767,6 +2213,16 @@ button:disabled {
   .event-detail-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .family-edit-basics,
+  .family-edit-member-row,
+  .family-edit-rider-row {
+    grid-template-columns: 1fr;
+  }
+
+  .family-remove-button {
+    justify-self: start;
   }
 }
 

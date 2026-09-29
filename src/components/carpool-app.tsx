@@ -29,9 +29,13 @@ import { MemberAvatar } from "@/components/member-avatar";
 import { ScheduleViews } from "@/components/schedule-views";
 import type { AppGroup } from "@/lib/app-data";
 import { useI18n } from "@/lib/i18n";
+import {
+  navigationStateFromSearchParams,
+  type Destination,
+  type NavigationState,
+} from "@/lib/navigation-state";
 import { createClient } from "@/lib/supabase/browser";
 
-type Destination = "rides" | "family" | "team" | "settings";
 type SettingsPage = "about" | "groups" | "help" | null;
 
 const destinations = [
@@ -43,14 +47,18 @@ const destinations = [
 
 export function CarpoolApp({
   initialGroups,
+  initialNavigation,
 }: {
   initialGroups: AppGroup[];
+  initialNavigation: NavigationState;
 }) {
   const router = useRouter();
   const { t } = useI18n();
   const groups = initialGroups;
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
-  const [destination, setDestination] = useState<Destination>("rides");
+  const [destination, setDestination] = useState<Destination>(
+    initialNavigation.destination,
+  );
   const [settingsPage, setSettingsPage] = useState<SettingsPage>(null);
   const [rosterMode, setRosterMode] = useState<"single" | "bulk">("single");
   const [memberDisplayName, setMemberDisplayName] = useState("");
@@ -59,6 +67,8 @@ export function CarpoolApp({
     "admin" | "coordinator" | "member"
   >("member");
   const [csv, setCsv] = useState("");
+  const [mergeMember, setMergeMember] = useState("");
+  const [intoMember, setIntoMember] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [existingGroupPhone, setExistingGroupPhone] = useState("");
   const [existingGroupPin, setExistingGroupPin] = useState("");
@@ -72,11 +82,84 @@ export function CarpoolApp({
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   const group = useMemo(
     () => groups.find((item) => item.id === activeGroupId) ?? groups[0],
     [activeGroupId, groups],
   );
+
+  useEffect(() => {
+    const updateOnlineState = () => setOffline(!navigator.onLine);
+    const restoreNavigation = () => {
+      setDestination(
+        navigationStateFromSearchParams(
+          new URL(window.location.href).searchParams,
+        ).destination,
+      );
+      setSettingsPage(null);
+    };
+    updateOnlineState();
+    window.addEventListener("online", updateOnlineState);
+    window.addEventListener("offline", updateOnlineState);
+    window.addEventListener("popstate", restoreNavigation);
+    return () => {
+      window.removeEventListener("online", updateOnlineState);
+      window.removeEventListener("offline", updateOnlineState);
+      window.removeEventListener("popstate", restoreNavigation);
+    };
+  }, []);
+
+  useEffect(() => {
+    const client = createClient();
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => router.refresh(), 250);
+    };
+    const channel = client.channel(`group-updates-${group.id}`);
+    for (const table of [
+      "group_households",
+      "group_access_roster",
+      "participants",
+      "group_locations",
+      "group_events",
+      "group_event_attendance",
+      "group_ride_claims",
+      "group_breaks",
+      "group_absence_periods",
+      "group_schedule_templates",
+    ]) {
+      channel.on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table,
+          filter: `group_id=eq.${group.id}`,
+        },
+        refresh,
+      );
+    }
+    channel.subscribe();
+    return () => {
+      clearTimeout(refreshTimer);
+      void client.removeChannel(channel);
+    };
+  }, [group.id, router]);
+
+  function navigate(nextDestination: Destination, history: "push" | "replace" = "push") {
+    setDestination(nextDestination);
+    setSettingsPage(null);
+    resetGroupState();
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", nextDestination);
+    window.history[history === "push" ? "pushState" : "replaceState"](
+      null,
+      "",
+      url,
+    );
+  }
 
   function resetGroupState() {
     setError("");
@@ -86,9 +169,7 @@ export function CarpoolApp({
 
   function switchGroup(groupId: string, nextDestination: Destination) {
     setActiveGroupId(groupId);
-    setDestination(nextDestination);
-    setSettingsPage(null);
-    resetGroupState();
+    navigate(nextDestination, "replace");
   }
 
   async function importRoster() {
@@ -173,6 +254,55 @@ export function CarpoolApp({
     }
   }
 
+  async function mergeHouseholds(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!mergeMember || !intoMember || mergeMember === intoMember) {
+      setError(t("Choose two different members to combine."));
+      return;
+    }
+    if (
+      !window.confirm(
+        t(
+          "Combine these members into one household? They will share rides and driving responsibility.",
+        ),
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/groups/${group.id}/households/merge`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mergeRosterEntryId: mergeMember,
+            intoRosterEntryId: intoMember,
+          }),
+        },
+      );
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          result.error ? t(result.error) : t("Could not combine households."),
+        );
+      }
+      setMergeMember("");
+      setIntoMember("");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : t("Could not combine households."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function createGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -246,7 +376,7 @@ export function CarpoolApp({
       setExistingGroupPhone("");
       setExistingGroupPin("");
       setActiveGroupId(result.groupId);
-      setDestination("rides");
+      navigate("rides");
       setSettingsPage(null);
       router.refresh();
     } catch (caught) {
@@ -276,7 +406,7 @@ export function CarpoolApp({
       }
       const nextGroup = groups.find((item) => item.id !== group.id);
       if (nextGroup) setActiveGroupId(nextGroup.id);
-      setDestination(nextGroup ? "settings" : "rides");
+      navigate(nextGroup ? "settings" : "rides");
       setShowDeleteGroup(false);
       setDeleteConfirmation("");
       router.refresh();
@@ -381,6 +511,7 @@ export function CarpoolApp({
   return (
     <div
       className="app-shell"
+      data-offline={offline}
       style={{ "--team": group.accent } as React.CSSProperties}
     >
       <a className="skip-link" href="#main-content">
@@ -436,9 +567,7 @@ export function CarpoolApp({
             type="button"
             aria-current={destination === id ? "page" : undefined}
             onClick={() => {
-              setDestination(id);
-              setSettingsPage(null);
-              resetGroupState();
+              navigate(id);
             }}
             className={
               destination === id ? "nav-item nav-item-active" : "nav-item"
@@ -451,6 +580,13 @@ export function CarpoolApp({
       </nav>
 
       <main id="main-content" tabIndex={-1} className="app-main">
+        {offline && (
+          <div className="notice offline-notice" role="status">
+            {t(
+              "Offline — showing saved information. Reconnect to make changes or open a route.",
+            )}
+          </div>
+        )}
         {(destination === "rides" ||
           destination === "family" ||
           destination === "team") && (
@@ -460,6 +596,13 @@ export function CarpoolApp({
             canManage={group.canManageRoster}
             view={destination}
             schedule={group.schedule}
+            roster={group.roster}
+            currentRosterEntryId={group.currentRosterEntryId}
+            offline={offline}
+            initialNavigation={initialNavigation}
+            onNavigate={(nextDestination) => {
+              navigate(nextDestination);
+            }}
           />
         )}
 
@@ -531,6 +674,59 @@ export function CarpoolApp({
                   <small>{t(member.role)}</small>
                 </div>
               ))}
+              {group.canManageRoster && (
+                <form
+                  className="schedule-form"
+                  onSubmit={mergeHouseholds}
+                >
+                  <h2>{t("Combine households")}</h2>
+                  <p className="text-muted">
+                    {t(
+                      "Put two members in one household so they share the same riders and rides.",
+                    )}
+                  </p>
+                  <label>
+                    {t("Member")}
+                    <select
+                      className="input"
+                      required
+                      value={mergeMember}
+                      onChange={(event) => setMergeMember(event.target.value)}
+                    >
+                      <option value="">{t("Choose member")}</option>
+                      {group.roster.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t("Into household of")}
+                    <select
+                      className="input"
+                      required
+                      value={intoMember}
+                      onChange={(event) => setIntoMember(event.target.value)}
+                    >
+                      <option value="">{t("Choose member")}</option>
+                      {group.roster.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="primary-button"
+                    disabled={
+                      loading || !mergeMember || !intoMember || mergeMember === intoMember
+                    }
+                  >
+                    {loading ? t("Saving…") : t("Combine")}
+                  </button>
+                </form>
+              )}
             </section>
             {group.canManageRoster && (
               <>
@@ -673,7 +869,7 @@ export function CarpoolApp({
             showDeleteGroup={showDeleteGroup}
             deleteConfirmation={deleteConfirmation}
             onGroups={() => setSettingsPage("groups")}
-            onSchedule={() => setDestination("rides")}
+            onSchedule={() => navigate("rides")}
             onPrivacy={() => router.push("/privacy")}
             onHelp={() => setSettingsPage("help")}
             onAbout={() => setSettingsPage("about")}

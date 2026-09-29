@@ -1,5 +1,5 @@
-const CACHE = "carpool-together-v2";
-const STATIC_ASSETS = ["/icon.svg", "/icon-192.png", "/icon-512.png"];
+const CACHE = "carpool-together-v3";
+const STATIC_ASSETS = ["/", "/icon.svg", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(STATIC_ASSETS)));
@@ -20,28 +20,17 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-  if (
-    event.request.method !== "GET" ||
-    url.origin !== self.location.origin ||
-    (!url.pathname.startsWith("/_next/static/") &&
-      !STATIC_ASSETS.includes(url.pathname))
-  ) {
-    return;
-  }
+  if (event.request.method !== "GET" || event.request.url.includes("/api/")) return;
   event.respondWith(
-    caches.match(event.request).then(
-      (cached) =>
-        cached ||
-        fetch(event.request).then((response) => {
-          if (response.ok) {
-            caches
-              .open(CACHE)
-              .then((cache) => cache.put(event.request, response.clone()));
-          }
-          return response;
-        }),
-    ),
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request)),
   );
 });
 
