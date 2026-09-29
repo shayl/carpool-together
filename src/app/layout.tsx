@@ -25,8 +25,7 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
   },
 };
 
