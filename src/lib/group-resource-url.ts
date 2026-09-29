@@ -8,6 +8,7 @@ export type GroupScheduleResource =
   | "locations"
   | "participants"
   | "households/merge"
+  | "households/membership"
   | "templates"
   | "venue-shares";
 

@@ -268,6 +268,11 @@ export const hebrew: Record<string, string> = {
   "Remove {{name}} from this household?": "להסיר את {{name}} ממשק הבית הזה?",
   "Combine households": "איחוד משקי בית",
   Households: "משקי בית",
+  Join: "צירוף",
+  "Choose household": "בחרו משק בית",
+  "Add {{name}} to a household": "צירוף {{name}} למשק בית",
+  "Move out": "הוצאה ממשק הבית",
+  "Choose who to move and where.": "בחרו את מי להעביר ולאן.",
   "Who lives together, their pickup address, and how much they have driven.":
     "מי גר יחד, כתובת האיסוף, וכמה נסיעות ביצעו.",
   "Select everyone who lives together — parents, a grandparent, an older sibling who drives — and combine them into one household.":

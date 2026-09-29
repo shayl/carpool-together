@@ -67,7 +67,6 @@ export function CarpoolApp({
     "admin" | "coordinator" | "member"
   >("member");
   const [csv, setCsv] = useState("");
-  const [mergeSelection, setMergeSelection] = useState<string[]>([]);
   const [newGroupName, setNewGroupName] = useState("");
   const [existingGroupPhone, setExistingGroupPhone] = useState("");
   const [existingGroupPin, setExistingGroupPin] = useState("");
@@ -247,51 +246,6 @@ export function CarpoolApp({
         caught instanceof Error
           ? caught.message
           : t("Could not add the person."),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function mergeHouseholds(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (mergeSelection.length < 2) {
-      setError(t("Choose at least two members to combine."));
-      return;
-    }
-    if (
-      !window.confirm(
-        t(
-          "Combine these members into one household? They will share riders, rides, and driving responsibility.",
-        ),
-      )
-    ) {
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const response = await fetch(
-        `/api/groups/${group.id}/households/merge`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rosterEntryIds: mergeSelection }),
-        },
-      );
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(
-          result.error ? t(result.error) : t("Could not combine households."),
-        );
-      }
-      setMergeSelection([]);
-      router.refresh();
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : t("Could not combine households."),
       );
     } finally {
       setLoading(false);
@@ -620,6 +574,21 @@ export function CarpoolApp({
             schedule={group.schedule}
             roster={group.roster}
             currentRosterEntryId={group.currentRosterEntryId}
+            uploadingImage={uploadingImage}
+            onMemberPhoto={(rosterEntryId, image) =>
+              void changeImage(
+                `/api/groups/${group.id}/roster/${rosterEntryId}/photo`,
+                image,
+                `member-${rosterEntryId}`,
+              )
+            }
+            onMemberPhotoRemove={(rosterEntryId) =>
+              void removeImage(
+                `/api/groups/${group.id}/roster/${rosterEntryId}/photo`,
+                `member-${rosterEntryId}`,
+              )
+            }
+            onPromote={changeMemberRole}
             offline={offline}
             initialNavigation={initialNavigation}
             onNavigate={(nextDestination) => {
@@ -630,136 +599,7 @@ export function CarpoolApp({
 
         {destination === "team" && (
           <>
-            <section className="surface-card roster-card">
-              <div className="card-heading">
-                <h2>{t("Group roster")}</h2>
-                <span>
-                  {t("{{count}} people", { count: group.roster.length })}
-                </span>
-              </div>
-              {group.roster.map((member) => (
-                <div className="person-row" key={member.id}>
-                  <MemberAvatar
-                    name={member.displayName}
-                    photoUrl={member.photoUrl}
-                    size={44}
-                    className="person-avatar"
-                  />
-                  <div>
-                    <strong>{member.displayName}</strong>
-                    <span>{member.phone ?? t("Phone hidden")}</span>
-                    {(group.canManageRoster ||
-                      group.currentRosterEntryId === member.id) && (
-                      <span className="image-actions">
-                        <label className="text-button image-upload-button">
-                          <ImagePlus size={15} aria-hidden="true" />
-                          {uploadingImage === `member-${member.id}`
-                            ? t("Uploading…")
-                            : member.photoUrl
-                              ? t("Change photo")
-                              : t("Add photo")}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            disabled={Boolean(uploadingImage)}
-                            onChange={(event) => {
-                              const image = event.target.files?.[0];
-                              event.target.value = "";
-                              if (image) {
-                                void changeImage(
-                                  `/api/groups/${group.id}/roster/${member.id}/photo`,
-                                  image,
-                                  `member-${member.id}`,
-                                );
-                              }
-                            }}
-                          />
-                        </label>
-                        {member.photoUrl && (
-                          <button
-                            className="text-button"
-                            type="button"
-                            disabled={Boolean(uploadingImage)}
-                            onClick={() =>
-                              void removeImage(
-                                `/api/groups/${group.id}/roster/${member.id}/photo`,
-                                `member-${member.id}`,
-                              )
-                            }
-                          >
-                            {t("Remove photo")}
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  {group.canManageRoster ? (
-                    member.role === "admin" || member.role === "owner" ? (
-                      <small>{t(member.role)}</small>
-                    ) : (
-                      <button
-                        className="text-button make-admin-link"
-                        type="button"
-                        disabled={loading}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              t("Make {{name}} an organizer?", {
-                                name: member.displayName,
-                              }),
-                            )
-                          ) {
-                            void changeMemberRole(member.id, "admin");
-                          }
-                        }}
-                      >
-                        {t("Make organizer")}
-                      </button>
-                    )
-                  ) : (
-                    <small>{t(member.role)}</small>
-                  )}
-                </div>
-              ))}
-              {group.canManageRoster && (
-                <form className="schedule-form" onSubmit={mergeHouseholds}>
-                  <h2>{t("Combine households")}</h2>
-                  <p className="text-muted">
-                    {t(
-                      "Select everyone who lives together \u2014 parents, a grandparent, an older sibling who drives \u2014 and combine them into one household.",
-                    )}
-                  </p>
-                  <div className="merge-member-list">
-                    {group.roster.map((member) => (
-                      <label className="merge-member" key={member.id}>
-                        <input
-                          type="checkbox"
-                          checked={mergeSelection.includes(member.id)}
-                          onChange={(event) =>
-                            setMergeSelection((current) =>
-                              event.target.checked
-                                ? [...current, member.id]
-                                : current.filter((id) => id !== member.id),
-                            )
-                          }
-                        />
-                        <span>{member.displayName}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <button
-                    className="primary-button"
-                    disabled={loading || mergeSelection.length < 2}
-                  >
-                    {loading
-                      ? t("Saving\u2026")
-                      : t("Combine {{count}} members", {
-                          count: mergeSelection.length,
-                        })}
-                  </button>
-                </form>
-              )}
-            </section>
+
             {group.canManageRoster && (
               <>
                 <h2 className="settings-section-title">{t("Add members")}</h2>

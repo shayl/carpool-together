@@ -15,6 +15,7 @@ import { enUS, he as hebrewLocale } from "date-fns/locale";
 import {
   CalendarDays,
   Car,
+  ImagePlus,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -80,6 +81,10 @@ type Props = {
   view: ScheduleView;
   schedule: GroupSchedule;
   roster: AppRosterEntry[];
+  uploadingImage?: string;
+  onMemberPhoto?: (rosterEntryId: string, image: File) => void;
+  onMemberPhotoRemove?: (rosterEntryId: string) => void;
+  onPromote?: (rosterEntryId: string, role: string) => void;
   currentRosterEntryId?: string | null;
   offline?: boolean;
   initialNavigation: NavigationState;
@@ -1716,6 +1721,10 @@ function TeamSchedule({
   canManage,
   schedule,
   roster,
+  uploadingImage,
+  onMemberPhoto,
+  onMemberPhotoRemove,
+  onPromote,
   offline,
   initialNavigation,
 }: Props) {
@@ -2107,12 +2116,40 @@ function TeamSchedule({
             <HouseholdRow
               key={household.id}
               household={household}
+              members={roster.filter(
+                (member) =>
+                  member.active && member.householdId === household.id,
+              )}
               riders={schedule.participants.filter(
                 (rider) => rider.householdId === household.id,
               )}
               driveCount={count}
               canManage={canManage}
+              otherHouseholds={schedule.households.filter(
+                (option) => option.id !== household.id,
+              )}
+              busy={Boolean(mutation.busyKey)}
+              uploadingImage={uploadingImage}
+              onMemberPhoto={onMemberPhoto}
+              onMemberPhotoRemove={onMemberPhotoRemove}
+              onPromote={onPromote}
               onEdit={() => setEditingHousehold(household.id)}
+              onJoin={(rosterEntryId, householdId) =>
+                void mutation.mutate(
+                  "households/membership",
+                  "PATCH",
+                  { rosterEntryId, householdId },
+                  `join-${rosterEntryId}`,
+                )
+              }
+              onLeave={(rosterEntryId) =>
+                void mutation.mutate(
+                  "households/membership",
+                  "PATCH",
+                  { rosterEntryId, householdId: null },
+                  `leave-${rosterEntryId}`,
+                )
+              }
             />
           ))}
         </div>
@@ -2152,45 +2189,176 @@ function TeamSchedule({
 
 function HouseholdRow({
   household,
+  members,
   riders,
   driveCount,
   canManage,
+  otherHouseholds,
+  busy,
+  uploadingImage,
+  onMemberPhoto,
+  onMemberPhotoRemove,
+  onPromote,
   onEdit,
+  onJoin,
+  onLeave,
 }: {
   household: GroupSchedule["households"][number];
+  members: AppRosterEntry[];
   riders: GroupSchedule["participants"];
   driveCount: number;
   canManage: boolean;
+  otherHouseholds: GroupSchedule["households"];
+  busy: boolean;
+  uploadingImage?: string;
+  onMemberPhoto?: (rosterEntryId: string, image: File) => void;
+  onMemberPhotoRemove?: (rosterEntryId: string) => void;
+  onPromote?: (rosterEntryId: string, role: string) => void;
   onEdit: () => void;
+  onJoin: (rosterEntryId: string, householdId: string) => void;
+  onLeave: (rosterEntryId: string) => void;
 }) {
   const { t } = useI18n();
+  // A household of one is really just a person who has not been grouped yet,
+  // so offer to move them into an existing family from the same line.
+  const single = members.length === 1;
 
   return (
-    <div className="household-row">
-      <div className="household-row-main">
-        <strong>{household.name}</strong>
-        <address>{household.address || t("No address added")}</address>
-        {riders.length > 0 && (
-          <span className="household-row-riders">
-            {t("Riders")}: {riders.map((rider) => rider.name).join(", ")}
+    <div className="household-card">
+      <div className="household-card-head">
+        <div className="household-row-main">
+          <strong>{household.name}</strong>
+          <address>{household.address || t("No address added")}</address>
+        </div>
+        <div className="household-row-side">
+          <span className="household-row-drives">
+            {t("{{count}} rides", { count: driveCount })}
           </span>
-        )}
+          {canManage && (
+            <button className="text-button" type="button" onClick={onEdit}>
+              <Pencil size={16} />
+              {t("Edit")}
+            </button>
+          )}
+        </div>
       </div>
-      <div className="household-row-side">
-        <span className="household-row-drives">
-          {t("{{count}} rides", { count: driveCount })}
-        </span>
-        {canManage && (
-          <button className="text-button" type="button" onClick={onEdit}>
-            <Pencil size={16} />
-            {t("Edit")}
-          </button>
-        )}
-      </div>
+      {members.map((member) => (
+        <div className="household-member" key={member.id}>
+          <MemberAvatar
+            name={member.displayName}
+            photoUrl={member.photoUrl}
+            size={36}
+          />
+          <div className="household-member-name">
+            <strong>{member.displayName}</strong>
+            <span>{member.phone ?? t("Phone hidden")}</span>
+            {canManage && onMemberPhoto && (
+              <span className="image-actions">
+                <label className="text-button image-upload-button">
+                  <ImagePlus size={15} aria-hidden="true" />
+                  {uploadingImage === `member-${member.id}`
+                    ? t("Uploading…")
+                    : member.photoUrl
+                      ? t("Change photo")
+                      : t("Add photo")}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={Boolean(uploadingImage)}
+                    onChange={(event) => {
+                      const image = event.target.files?.[0];
+                      event.target.value = "";
+                      if (image) onMemberPhoto(member.id, image);
+                    }}
+                  />
+                </label>
+                {member.photoUrl && onMemberPhotoRemove && (
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={Boolean(uploadingImage)}
+                    onClick={() => onMemberPhotoRemove(member.id)}
+                  >
+                    {t("Remove photo")}
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
+          {canManage &&
+            onPromote &&
+            (member.role === "admin" || member.role === "owner" ? (
+              <small className="household-member-role">{t(member.role)}</small>
+            ) : (
+              <button
+                className="text-button make-admin-link"
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      t("Make {{name}} an organizer?", {
+                        name: member.displayName,
+                      }),
+                    )
+                  ) {
+                    onPromote(member.id, "admin");
+                  }
+                }}
+              >
+                {t("Make organizer")}
+              </button>
+            ))}
+          {canManage && (
+            <span className="household-member-actions">
+              {single && otherHouseholds.length > 0 ? (
+                <label className="household-join">
+                  <span className="household-join-label">{t("Join")}</span>
+                  <select
+                    className="input"
+                    value=""
+                    disabled={busy}
+                    aria-label={t("Add {{name}} to a household", {
+                      name: member.displayName,
+                    })}
+                    onChange={(event) => {
+                      if (event.target.value) {
+                        onJoin(member.id, event.target.value);
+                      }
+                    }}
+                  >
+                    <option value="">{t("Choose household")}</option>
+                    {otherHouseholds.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                !single && (
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onLeave(member.id)}
+                  >
+                    {t("Move out")}
+                  </button>
+                )
+              )}
+            </span>
+          )}
+        </div>
+      ))}
+      {riders.length > 0 && (
+        <p className="household-row-riders">
+          {t("Riders")}: {riders.map((rider) => rider.name).join(", ")}
+        </p>
+      )}
     </div>
   );
 }
-
 function VenueRow({
   location,
   canManage,

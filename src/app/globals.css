@@ -2348,3 +2348,71 @@ button:disabled {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.household-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.household-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.household-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.household-member-name {
+  min-width: 0;
+  flex: 1;
+}
+
+.household-member-name strong {
+  display: block;
+}
+
+.household-member-name > span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.household-member-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.household-member-role {
+  flex: 0 0 auto;
+  color: var(--team);
+  font-weight: 650;
+}
+
+.household-join {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.household-join-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.household-join select {
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 13px;
+}
