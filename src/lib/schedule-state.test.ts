@@ -4,6 +4,7 @@ import {
   driveCounts,
   effectiveAttendance,
   eventCoverage,
+  eventDrivers,
   rideState,
 } from "./schedule-state";
 import type { GroupSchedule } from "./schedule-types";
@@ -109,4 +110,49 @@ test("absence periods suppress rides unless a newer daily choice exists", () => 
     effectiveAttendance(absentSchedule, event, participant).absent,
     true,
   );
+});
+
+test("names the driving households once per event", () => {
+  const event = schedule.events[0];
+  // Only the outbound leg is claimed, so only that household is named.
+  assert.deepEqual(eventDrivers(schedule, event), ["Alef"]);
+
+  // A household covering both directions is still named once.
+  const bothLegs: GroupSchedule = {
+    ...schedule,
+    claims: [
+      ...schedule.claims,
+      {
+        id: "c2",
+        eventId: "e1",
+        leg: "from_event",
+        householdId: "h1",
+        driverRosterEntryId: null,
+        claimedBy: "u1",
+      },
+    ],
+  };
+  assert.deepEqual(eventDrivers(bothLegs, event), ["Alef"]);
+
+  // Two households splitting the directions are both named.
+  const split: GroupSchedule = {
+    ...schedule,
+    claims: [
+      ...schedule.claims,
+      {
+        id: "c3",
+        eventId: "e1",
+        leg: "from_event",
+        householdId: "h2",
+        driverRosterEntryId: null,
+        claimedBy: "u1",
+      },
+    ],
+  };
+  assert.deepEqual(eventDrivers(split, event), ["Alef", "Bet"]);
+});
+
+test("names nobody when an event has no claims", () => {
+  const unclaimed: GroupSchedule = { ...schedule, claims: [] };
+  assert.deepEqual(eventDrivers(unclaimed, schedule.events[0]), []);
 });

@@ -46,3 +46,6 @@ next-env.d.ts
 
 # local dev launcher (machine-specific CA path)
 dev.local.sh
+
+# local MCP server config (machine-specific tooling)
+.mcp.json

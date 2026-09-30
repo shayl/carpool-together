@@ -23,6 +23,8 @@ const familySchema = z
       )
       .min(1)
       .max(10),
+    // A household can have no riders: adults who only drive, or a family
+    // whose children have aged out.
     riders: z
       .array(
         z.object({
@@ -30,7 +32,6 @@ const familySchema = z
           name: z.string().trim().min(1).max(100),
         }),
       )
-      .min(1)
       .max(20),
   })
   .refine(

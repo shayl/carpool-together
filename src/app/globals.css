@@ -1107,6 +1107,14 @@ button:disabled {
   text-align: start;
 }
 
+.month-event-driver {
+  overflow: hidden;
+  color: var(--team);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .month-event-sad {
   background: #fff0ed;
 }

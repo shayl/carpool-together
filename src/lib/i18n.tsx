@@ -334,6 +334,8 @@ export const hebrew: Record<string, string> = {
   "Save address": "שמירת הכתובת",
   "All rides covered": "לכל הנסיעות יש נהג",
   "All rides have drivers": "לכל הנסיעות יש נהגים",
+  "{{name}} is driving": "{{name}} מסיעים",
+  "{{names}} are driving": "{{names}} מסיעים",
   "Member ride status": "מצב הנסיעות של חברי הקבוצה",
   "Apply an absence to several events at once.":
     "החילו היעדרות על כמה אירועים בבת אחת.",

@@ -111,6 +111,18 @@ export function eventCoverage(
   return rides.every((ride) => ride.claim) ? ("covered" as const) : ("open" as const);
 }
 
+// Who is driving an event, in leg order and without repeats, so a single
+// household covering both directions reads as one name.
+export function eventDrivers(schedule: GroupSchedule, event: GroupEvent) {
+  const names = requiredLegs(event)
+    .map((leg) => rideState(schedule, event, leg))
+    .filter((ride) => ride.active && ride.claim)
+    .map((ride) => ride.household?.name)
+    .filter((name): name is string => Boolean(name));
+
+  return [...new Set(names)];
+}
+
 export function driveCounts(schedule: GroupSchedule) {
   return schedule.households
     .map((household) => ({
