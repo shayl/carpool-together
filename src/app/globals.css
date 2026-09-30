@@ -1,12 +1,133 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+/* Semantic tokens. Every rule below reads from these so the dark theme is a
+   single override rather than a parallel stylesheet. */
 :root {
+  color-scheme: light;
   --background: #faf9fc;
   --foreground: #252033;
   --team: #5b4bdb;
   --muted: #686174;
   --border: #e5e1eb;
+
+  /* Raised surfaces: cards, sheets, menus, inputs. */
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-subtle: #f7f5fa;
+  --surface-sunken: #fcfbfd;
+  --surface-translucent: #ffffffed;
+  --surface-hover: rgb(15 23 42 / 6%);
+  /* Text on an accent-filled surface. */
+  --on-accent: #ffffff;
+  --accent-tint: color-mix(in srgb, var(--team) 10%, var(--surface));
+  --accent-tint-strong: color-mix(in srgb, var(--team) 13%, var(--surface));
+
+  --shadow-card: 0 18px 50px #25203314;
+  --shadow-menu: 0 14px 32px rgb(15 23 42 / 14%);
+  --shadow-header: 0 4px 16px #25203314;
+
+  /* Status colors, paired background/foreground. */
+  --ok-surface: #edf6f1;
+  --ok-text: #235842;
+  --warn-surface: #fff6e6;
+  --warn-border: #eadcad;
+  --danger-surface: #fff0ed;
+  --danger-text: #8f382b;
+  --danger-strong: #b42318;
+  --danger-border: #f2b8b5;
+  --danger-accent: #b83245;
+  --warn-text: #795012;
+  --ok-border: #a8dcc4;
+  --scrim: #1f172c80;
+  --shadow-subtle: 0 1px 3px #25203314;
+  --shadow-sheet: 0 -12px 40px #251d3330;
+  --shadow-float: 0 4px 18px #25203330;
+  --car-ink: #31283d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #14121a;
+    --foreground: #ece9f2;
+    /* Lightened so accent text and fills clear AA on a dark surface. */
+    --team: #a89bf5;
+    --muted: #a49db4;
+    --border: #322c3d;
+
+    --surface: #1d1a25;
+    --surface-raised: #24202e;
+    --surface-subtle: #211d2a;
+    --surface-sunken: #191622;
+    --surface-translucent: #1d1a25f2;
+    --surface-hover: rgb(255 255 255 / 8%);
+    --on-accent: #1a1622;
+    --accent-tint: color-mix(in srgb, var(--team) 18%, var(--surface));
+    --accent-tint-strong: color-mix(in srgb, var(--team) 24%, var(--surface));
+
+    --shadow-card: 0 18px 50px rgb(0 0 0 / 45%);
+    --shadow-menu: 0 14px 32px rgb(0 0 0 / 50%);
+    --shadow-header: 0 4px 16px rgb(0 0 0 / 40%);
+
+    --ok-surface: #1b3227;
+    --ok-text: #8fd9b0;
+    --warn-surface: #33291a;
+    --warn-border: #5c4a26;
+    --danger-surface: #3a211d;
+    --danger-text: #ffb4a6;
+    --danger-strong: #ff6b58;
+    --danger-border: #7a3b33;
+    --danger-accent: #ff8f9e;
+    --warn-text: #e8c98a;
+    --ok-border: #2f5a44;
+    --scrim: #05040acc;
+    --shadow-subtle: 0 1px 3px rgb(0 0 0 / 50%);
+    --shadow-sheet: 0 -12px 40px rgb(0 0 0 / 55%);
+    --shadow-float: 0 4px 18px rgb(0 0 0 / 50%);
+    --car-ink: #0d0a12;
+  }
+}
+
+/* Explicit override, set by the theme toggle. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #14121a;
+  --foreground: #ece9f2;
+  --team: #a89bf5;
+  --muted: #a49db4;
+  --border: #322c3d;
+
+  --surface: #1d1a25;
+  --surface-raised: #24202e;
+  --surface-subtle: #211d2a;
+  --surface-sunken: #191622;
+  --surface-translucent: #1d1a25f2;
+  --surface-hover: rgb(255 255 255 / 8%);
+  --on-accent: #1a1622;
+  --accent-tint: color-mix(in srgb, var(--team) 18%, var(--surface));
+  --accent-tint-strong: color-mix(in srgb, var(--team) 24%, var(--surface));
+
+  --shadow-card: 0 18px 50px rgb(0 0 0 / 45%);
+  --shadow-menu: 0 14px 32px rgb(0 0 0 / 50%);
+  --shadow-header: 0 4px 16px rgb(0 0 0 / 40%);
+
+  --ok-surface: #1b3227;
+  --ok-text: #8fd9b0;
+  --warn-surface: #33291a;
+  --warn-border: #5c4a26;
+  --danger-surface: #3a211d;
+  --danger-text: #ffb4a6;
+  --danger-strong: #ff6b58;
+  --danger-border: #7a3b33;
+    --danger-accent: #ff8f9e;
+  --warn-text: #e8c98a;
+  --ok-border: #2f5a44;
+  --scrim: #05040acc;
+  --shadow-subtle: 0 1px 3px rgb(0 0 0 / 50%);
+  --shadow-sheet: 0 -12px 40px rgb(0 0 0 / 55%);
+  --shadow-float: 0 4px 18px rgb(0 0 0 / 50%);
+  --car-ink: #0d0a12;
 }
 
 @theme inline {
@@ -35,12 +156,12 @@ body {
   min-height: 36px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fffffff2;
+  background: var(--surface-translucent);
   padding: 6px 12px;
   color: var(--team);
   font-size: 13px;
   font-weight: 750;
-  box-shadow: 0 4px 16px #25203314;
+  box-shadow: var(--shadow-header);
 }
 
 [dir="rtl"] body {
@@ -110,7 +231,7 @@ button:disabled {
   inset-inline-start: 16px;
   z-index: 100;
   padding: 12px;
-  background: white;
+  background: var(--surface);
 }
 
 .skip-link:focus {
@@ -127,7 +248,7 @@ button:disabled {
 
 .app-header {
   border-bottom: 1px solid var(--border);
-  background: #ffffffed;
+  background: var(--surface-translucent);
 }
 
 .app-header-inner {
@@ -155,7 +276,7 @@ button:disabled {
   place-items: center;
   border-radius: 9px;
   background: var(--team);
-  color: white;
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 850;
 }
@@ -166,7 +287,7 @@ button:disabled {
   place-items: center;
   overflow: hidden;
   border-radius: 999px;
-  background-color: color-mix(in srgb, var(--team) 13%, white);
+  background-color: var(--accent-tint-strong);
   background-position: center;
   background-size: cover;
   color: var(--team);
@@ -175,13 +296,13 @@ button:disabled {
 }
 
 .member-avatar-photo {
-  box-shadow: inset 0 0 0 2px white;
+  box-shadow: inset 0 0 0 2px var(--surface);
 }
 
 .team-logo.member-avatar {
   border-radius: 9px;
   background-color: var(--team);
-  color: white;
+  color: var(--on-accent);
 }
 
 .brand-copy {
@@ -240,9 +361,9 @@ button:disabled {
   gap: 22px;
   border: 1px solid var(--border);
   border-radius: 24px;
-  background: white;
+  background: var(--surface);
   padding: 28px;
-  box-shadow: 0 18px 50px #25203314;
+  box-shadow: var(--shadow-card);
 }
 
 .auth-logo {
@@ -252,7 +373,7 @@ button:disabled {
   place-items: center;
   border-radius: 12px;
   background: var(--team);
-  color: white;
+  color: var(--on-accent);
   font-weight: 850;
 }
 
@@ -296,7 +417,7 @@ button:disabled {
   min-height: 48px;
   align-items: center;
   gap: 9px;
-  border: 1px solid #d9dce5;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0 13px;
   color: var(--muted);
@@ -324,18 +445,18 @@ button:disabled {
 
 .auth-message {
   border-radius: 12px;
-  background: #edf6f1;
+  background: var(--ok-surface);
   padding: 12px 14px;
-  color: #235842;
+  color: var(--ok-text);
   font-size: 14px;
   line-height: 1.5;
 }
 
 .auth-error {
   border-radius: 12px;
-  background: #fff0ed;
+  background: var(--danger-surface);
   padding: 12px 14px;
-  color: #8f382b;
+  color: var(--danger-text);
   font-size: 14px;
 }
 
@@ -370,7 +491,7 @@ button:disabled {
   appearance: none;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
   padding: 0 38px 0 12px;
   color: var(--foreground);
   font-size: 14px;
@@ -400,7 +521,7 @@ button:disabled {
   display: flex;
   justify-content: center;
   border-top: 1px solid var(--border);
-  background: #fffffffa;
+  background: var(--surface-translucent);
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
 }
 
@@ -419,7 +540,7 @@ button:disabled {
 }
 
 .nav-item-active {
-  background: color-mix(in srgb, var(--team) 10%, white);
+  background: var(--accent-tint);
   color: var(--team);
 }
 
@@ -474,7 +595,7 @@ button:disabled {
 }
 
 .icon-button:hover {
-  background: #f0edfc;
+  background: var(--accent-tint);
   color: var(--team);
 }
 
@@ -484,15 +605,15 @@ button:disabled {
   justify-content: space-between;
   gap: 8px;
   border-radius: 14px;
-  background: #edf6f1;
+  background: var(--ok-surface);
   padding: 10px 14px;
-  color: #235842;
+  color: var(--ok-text);
   font-size: 13px;
 }
 
 .coverage-open {
-  background: #fff6e6;
-  color: #795012;
+  background: var(--warn-surface);
+  color: var(--warn-text);
 }
 
 .ride-filters {
@@ -500,7 +621,7 @@ button:disabled {
   gap: 4px;
   margin: 16px 0;
   border-radius: 14px;
-  background: #eeebf2;
+  background: var(--surface-subtle);
   padding: 4px;
 }
 
@@ -508,22 +629,22 @@ button:disabled {
   flex: 1;
   border-radius: 10px;
   padding: 8px 5px;
-  color: #5f576d;
+  color: var(--muted);
   font-size: 14px;
   font-weight: 600;
 }
 
 .ride-filters button[aria-pressed="true"] {
-  background: white;
+  background: var(--surface);
   color: var(--foreground);
-  box-shadow: 0 1px 3px #25203314;
+  box-shadow: var(--shadow-subtle);
 }
 
 .surface-card,
 .weekly-events-card {
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: white;
+  background: var(--surface);
 }
 
 .surface-card {
@@ -606,7 +727,7 @@ button:disabled {
 }
 
 .ride-status-car-sad {
-  color: #b83245;
+  color: var(--danger-accent);
   transform: translateY(2px) rotate(-1.5deg);
 }
 
@@ -615,11 +736,11 @@ button:disabled {
 }
 
 .weekly-event-happy .weekly-event-coverage > span {
-  color: #235842;
+  color: var(--ok-text);
 }
 
 .weekly-event-sad .weekly-event-coverage > span {
-  color: #805511;
+  color: var(--warn-text);
 }
 
 .weekly-event-chevron {
@@ -629,7 +750,7 @@ button:disabled {
 
 .weekly-event-details {
   border-top: 1px solid var(--border);
-  background: #fcfbfd;
+  background: var(--surface-sunken);
   padding: 16px;
 }
 
@@ -667,7 +788,7 @@ button:disabled {
 
 .driver-row {
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
   padding: 10px 12px;
 }
 
@@ -727,18 +848,18 @@ button:disabled {
   min-height: 2.75rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid #b42318;
+  border: 1px solid var(--danger-strong);
   border-radius: 0.75rem;
-  background: #b42318;
+  background: var(--danger-strong);
   padding: 0.7rem 1rem;
-  color: white;
+  color: var(--on-accent);
   font-weight: 700;
 }
 
 .danger-card {
   display: grid;
   gap: 16px;
-  border-color: #f2b8b5;
+  border-color: var(--danger-border);
 }
 
 .danger-card h3,
@@ -797,11 +918,11 @@ button:disabled {
 }
 
 .weekly-event-open {
-  border-color: #f2b8b5;
+  border-color: var(--danger-border);
 }
 
 .weekly-event-covered {
-  border-color: #a8dcc4;
+  border-color: var(--ok-border);
 }
 
 [dir="rtl"] .event-chevron {
@@ -861,7 +982,7 @@ button:disabled {
 .member-avatar-item:hover .member-avatar,
 .member-avatar-item:focus-visible .member-avatar {
   box-shadow:
-    inset 0 0 0 2px white,
+    inset 0 0 0 2px var(--surface),
     0 0 0 3px var(--team);
 }
 
@@ -906,7 +1027,7 @@ button:disabled {
 .participant-status-backdrop {
   position: absolute;
   inset: 0;
-  background: #1f172c80;
+  background: var(--scrim);
 }
 
 .participant-status-panel,
@@ -920,9 +1041,9 @@ button:disabled {
   overflow-y: auto;
   margin: 0 auto;
   border-radius: 24px 24px 0 0;
-  background: white;
+  background: var(--surface);
   padding: 22px;
-  box-shadow: 0 -12px 40px #251d3330;
+  box-shadow: var(--shadow-sheet);
 }
 
 .status-choice {
@@ -954,7 +1075,7 @@ button:disabled {
   display: grid;
   gap: 7px;
   border-radius: 12px;
-  background: #f7f5fa;
+  background: var(--surface-subtle);
   padding: 10px 12px;
 }
 
@@ -998,7 +1119,7 @@ button:disabled {
   grid-template-columns: 26px minmax(0, 1fr);
   gap: 8px;
   border-radius: 12px;
-  background: #f7f5fa;
+  background: var(--surface-subtle);
   padding: 10px;
 }
 
@@ -1009,7 +1130,7 @@ button:disabled {
   place-items: center;
   border-radius: 999px;
   background: var(--team);
-  color: white;
+  color: var(--on-accent);
   font-size: 12px;
 }
 
@@ -1025,7 +1146,7 @@ button:disabled {
 }
 
 .route-stops .route-stop-current {
-  background: color-mix(in srgb, var(--team) 10%, white);
+  background: var(--accent-tint);
 }
 
 .attendance-row label,
@@ -1041,7 +1162,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: white;
+  background: var(--surface);
 }
 
 .month-weekdays,
@@ -1085,7 +1206,7 @@ button:disabled {
 }
 
 .month-day-empty {
-  background: #faf9fc;
+  background: var(--background);
 }
 
 .month-events {
@@ -1100,23 +1221,31 @@ button:disabled {
   min-height: 34px;
   border: 0;
   border-radius: 7px;
-  background: #f1efff;
+  background: var(--accent-tint);
   padding: 4px;
   color: var(--foreground);
   font-size: 9px;
   text-align: start;
 }
 
+.month-event-driver {
+  overflow: hidden;
+  color: var(--team);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .month-event-sad {
-  background: #fff0ed;
+  background: var(--danger-surface);
 }
 
 .month-event-happy {
-  background: #edf6f1;
+  background: var(--ok-surface);
 }
 
 .month-event-neutral {
-  background: #f1efff;
+  background: var(--accent-tint);
 }
 
 .image-actions {
@@ -1215,7 +1344,7 @@ button:disabled {
   background: var(--background);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 12px 28px rgb(15 23 42 / 12%);
+  box-shadow: var(--shadow-menu);
   max-height: 280px;
   overflow-y: auto;
 }
@@ -1249,7 +1378,7 @@ button:disabled {
 
 .address-suggestion:hover,
 .address-suggestion-active {
-  background: rgb(15 23 42 / 6%);
+  background: var(--surface-hover);
 }
 
 .schedule-form {
@@ -1258,7 +1387,7 @@ button:disabled {
   gap: 12px;
   margin-top: 16px;
   border-radius: 14px;
-  background: #faf9fc;
+  background: var(--background);
   padding: 16px;
 }
 
@@ -1308,7 +1437,7 @@ button:disabled {
   align-items: center;
   gap: 12px;
   border-radius: 14px;
-  background: #faf9fc;
+  background: var(--background);
   padding: 16px;
   color: var(--muted);
 }
@@ -1419,10 +1548,10 @@ button:disabled {
   margin: 0 auto;
   border: 0;
   border-radius: 24px 24px 0 0;
-  background: white;
+  background: var(--surface);
   padding: 0;
   color: var(--foreground);
-  box-shadow: 0 -10px 50px #25203320;
+  box-shadow: var(--shadow-sheet);
 }
 
 .app-sheet[open] {
@@ -1448,7 +1577,7 @@ button:disabled {
 }
 
 .app-sheet::backdrop {
-  background: #20192b70;
+  background: var(--scrim);
   backdrop-filter: blur(2px);
 }
 
@@ -1514,9 +1643,9 @@ button:disabled {
   height: 48px;
   place-items: center;
   border-radius: 999px;
-  background: white;
+  background: var(--surface);
   color: var(--team);
-  box-shadow: 0 4px 18px #25203330;
+  box-shadow: var(--shadow-float);
 }
 
 .map-picker-footer {
@@ -1542,7 +1671,7 @@ button:disabled {
   width: 36px;
   height: 36px;
   transform: rotate(45deg);
-  border: 3px solid white;
+  border: 3px solid var(--surface);
   border-radius: 50% 50% 50% 0;
   background: var(--team);
   box-shadow: 0 3px 10px rgb(0 0 0 / 30%);
@@ -1552,11 +1681,39 @@ button:disabled {
   position: absolute;
   inset: 9px;
   border-radius: 999px;
-  background: white;
+  background: var(--surface);
 }
 
 .leaflet-container {
   font-family: var(--font-geist-sans), Arial, sans-serif;
+  background: var(--surface-subtle);
+}
+
+/* Leaflet ships light-mode chrome and bright raster tiles. Tone both down so
+   the map does not glare out of a dark page. The rules are duplicated rather
+   than combined because the media query must not leak into light mode. */
+:root[data-theme="dark"] .leaflet-tile-pane {
+  filter: brightness(0.75) contrast(1.05) saturate(0.85);
+}
+
+:root[data-theme="dark"] .leaflet-control-zoom a,
+:root[data-theme="dark"] .leaflet-control-attribution {
+  background: var(--surface-raised);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .leaflet-tile-pane {
+    filter: brightness(0.75) contrast(1.05) saturate(0.85);
+  }
+
+  :root:not([data-theme="light"]) .leaflet-control-zoom a,
+  :root:not([data-theme="light"]) .leaflet-control-attribution {
+    background: var(--surface-raised);
+    border-color: var(--border);
+    color: var(--foreground);
+  }
 }
 
 .family-edit-form {
@@ -1587,7 +1744,7 @@ button:disabled {
   align-items: end;
   gap: 8px;
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
   padding: 12px 0;
 }
 
@@ -1597,7 +1754,7 @@ button:disabled {
 }
 
 .family-edit-member-row label > span {
-  color: #667085;
+  color: var(--muted);
   font-size: 12px;
   font-weight: 750;
   text-transform: uppercase;
@@ -1611,13 +1768,13 @@ button:disabled {
   align-self: end;
   border-radius: 10px;
   padding: 8px 10px;
-  color: #dc2626;
+  color: var(--danger-strong);
   font-size: 14px;
   font-weight: 650;
 }
 
 .family-remove-button:disabled {
-  color: #cbd5e1;
+  color: var(--border);
 }
 
 .family-add-actions {
@@ -1680,7 +1837,7 @@ button:disabled {
 }
 
 .text-danger {
-  color: #b42318;
+  color: var(--danger-strong);
 }
 
 @media (max-width: 640px) {
@@ -1723,20 +1880,20 @@ button:disabled {
 
 .primary-button {
   background: var(--team);
-  color: white;
+  color: var(--on-accent);
 }
 
 .secondary-button {
-  border: 1px solid #cbd5e1;
-  background: white;
-  color: #334155;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
 }
 
 .suggestion-result {
   margin-top: 14px;
   border: 1px solid color-mix(in srgb, var(--team) 20%, var(--border));
   border-radius: 14px;
-  background: white;
+  background: var(--surface);
   padding: 14px;
 }
 
@@ -1783,7 +1940,7 @@ button:disabled {
 .unassigned,
 .error {
   margin: 12px 0 0;
-  color: #8f382b;
+  color: var(--danger-text);
   font-size: 13px;
 }
 
@@ -1811,7 +1968,7 @@ button:disabled {
 }
 
 .status-covered {
-  color: #235842;
+  color: var(--ok-text);
 }
 
 .settings-section-title {
@@ -1899,7 +2056,7 @@ button:disabled {
 }
 
 .text-button:hover {
-  background: #f0edfc;
+  background: var(--accent-tint);
 }
 
 .back-button {
@@ -1962,9 +2119,9 @@ button:disabled {
 .input {
   width: 100%;
   min-width: 0;
-  border: 1px solid #d9dce5;
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
-  background: white;
+  background: var(--surface);
   padding: 0.75rem 0.875rem;
   color: var(--foreground);
   font-size: 1rem;
@@ -1989,7 +2146,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: white;
+  background: var(--surface);
 }
 
 .settings-link-card button {
@@ -2007,7 +2164,7 @@ button:disabled {
 }
 
 .settings-link-card button:hover {
-  background: #faf9fc;
+  background: var(--background);
 }
 
 .settings-link-card button > span {
@@ -2030,13 +2187,13 @@ button:disabled {
   place-items: center;
   border-radius: 6px;
   background: var(--team);
-  color: white;
+  color: var(--on-accent);
   font-size: 8px;
   font-weight: 850;
 }
 
 .settings-link-card button[aria-current="true"] {
-  background: color-mix(in srgb, var(--team) 8%, white);
+  background: var(--accent-tint);
 }
 
 .about-card {
@@ -2074,7 +2231,7 @@ button:disabled {
 .legal-copy {
   display: grid;
   gap: 12px;
-  color: #40394c;
+  color: var(--foreground);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -2084,11 +2241,11 @@ button:disabled {
 }
 
 .legal-review-note {
-  border: 1px solid #eadcad;
+  border: 1px solid var(--warn-border);
   border-radius: 12px;
-  background: #fff9e8;
+  background: var(--warn-surface);
   padding: 12px 14px;
-  color: #694f12;
+  color: var(--warn-text);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -2116,7 +2273,7 @@ button:disabled {
   display: block;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: #f8f7ff;
+  background: var(--surface-subtle);
   padding: 16px;
   color: var(--foreground);
   font-size: clamp(30px, 9vw, 44px);
@@ -2439,8 +2596,8 @@ button:disabled {
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: white;
-  box-shadow: 0 14px 32px rgb(15 23 42 / 14%);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
 }
 
 .action-menu-item {
@@ -2459,11 +2616,11 @@ button:disabled {
 }
 
 .action-menu-item:hover {
-  background: rgb(15 23 42 / 6%);
+  background: var(--surface-hover);
 }
 
 .action-menu-item-danger {
-  color: #8f382b;
+  color: var(--danger-text);
 }
 
 /* The photo control is a label wrapping a file input, so it needs the
@@ -2488,4 +2645,10 @@ button:disabled {
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+.theme-picker button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

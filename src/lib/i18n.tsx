@@ -334,6 +334,8 @@ export const hebrew: Record<string, string> = {
   "Save address": "שמירת הכתובת",
   "All rides covered": "לכל הנסיעות יש נהג",
   "All rides have drivers": "לכל הנסיעות יש נהגים",
+  "{{name}} is driving": "{{name}} מסיעים",
+  "{{names}} are driving": "{{names}} מסיעים",
   "Member ride status": "מצב הנסיעות של חברי הקבוצה",
   "Apply an absence to several events at once.":
     "החילו היעדרות על כמה אירועים בבת אחת.",
@@ -503,6 +505,13 @@ export const hebrew: Record<string, string> = {
     "אמתו קבוצה נוספת באמצעות מספר הטלפון והקוד שלה. הקבוצות שאומתו יופיעו בבורר.",
   "Add group": "הוספת קבוצה",
   "Could not add the group.": "לא ניתן להוסיף את הקבוצה.",
+  Appearance: "מראה",
+  Theme: "ערכת נושא",
+  "Match your device, or pick light or dark for this browser.":
+    "התאמה למכשיר, או בחירה בין מראה בהיר לכהה בדפדפן הזה.",
+  "Match device": "התאמה למכשיר",
+  Light: "בהיר",
+  Dark: "כהה",
   "Group appearance": "מראה הקבוצה",
   "Group icon": "סמל הקבוצה",
   "Shown in the app header and group switcher.":

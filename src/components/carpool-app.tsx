@@ -26,6 +26,7 @@ import { GroupPinSettings } from "@/components/group-pin-settings";
 import { InstallAppCard } from "@/components/install-app-card";
 import { PushReminderSettings } from "@/components/push-reminder-settings";
 import { MemberAvatar } from "@/components/member-avatar";
+import { ThemePicker } from "@/components/theme-picker";
 import { ScheduleViews } from "@/components/schedule-views";
 import type { AppGroup } from "@/lib/app-data";
 import { useI18n } from "@/lib/i18n";
@@ -954,6 +955,14 @@ function SettingsHome(props: SettingsHomeProps) {
         <h1>{t("Settings")}</h1>
         <p>{props.group.name}</p>
       </div>
+      <h2 className="settings-section-title">{t("Appearance")}</h2>
+      <section className="surface-card">
+        <h3>{t("Theme")}</h3>
+        <p className="text-muted">
+          {t("Match your device, or pick light or dark for this browser.")}
+        </p>
+        <ThemePicker />
+      </section>
       {props.group.canManageRoster && (
         <>
           <h2 className="settings-section-title">{t("Group appearance")}</h2>

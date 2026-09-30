@@ -38,6 +38,7 @@ import {
   driveCounts,
   effectiveAttendance,
   eventCoverage,
+  eventDrivers,
   isEventInBreak,
   requiredLegs,
   rideState,
@@ -499,17 +500,25 @@ function MonthGrid({
             <li key={date} className="month-day">
               <time dateTime={date}>{format(day, "d")}</time>
               <div className="month-events">
-                {dayEvents.map((event) => (
-                  <button
-                    key={event.id}
-                    className={`month-event month-event-${coverageMood(eventCoverage(schedule, event))}`}
-                    type="button"
-                    onClick={() => onOpen(event.id)}
-                  >
-                    <strong>{event.startTime}</strong>
-                    <span>{t(eventTitle(event))}</span>
-                  </button>
-                ))}
+                {dayEvents.map((event) => {
+                  const drivers = eventDrivers(schedule, event);
+                  return (
+                    <button
+                      key={event.id}
+                      className={`month-event month-event-${coverageMood(eventCoverage(schedule, event))}`}
+                      type="button"
+                      onClick={() => onOpen(event.id)}
+                    >
+                      <strong>{event.startTime}</strong>
+                      <span>{t(eventTitle(event))}</span>
+                      {drivers.length > 0 && (
+                        <span className="month-event-driver">
+                          {drivers.join(" · ")}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </li>
           );
@@ -545,6 +554,7 @@ function EventCard({
     (participant) => participant.id === selectedParticipantId,
   );
   const coverage = eventCoverage(schedule, event);
+  const drivers = eventDrivers(schedule, event);
   const openRides = requiredLegs(event).filter(
     (leg) => rideState(schedule, event, leg).open,
   ).length;
@@ -573,7 +583,9 @@ function EventCard({
           <RideStatusCar status={coverage} />
           <span>
             {coverage === "covered"
-              ? t("All rides have drivers")
+              ? drivers.length === 1
+                ? t("{{name}} is driving", { name: drivers[0] })
+                : t("{{names}} are driving", { names: drivers.join(" · ") })
               : coverage === "open"
                 ? t("{{count}} rides need a driver", { count: openRides })
                 : t("No carpool needed")}
@@ -1742,7 +1754,7 @@ function FamilyEditForm({
       </div>
       <button
         className="primary-button family-save-button"
-        disabled={busy || !guardians.length || !riders.length}
+        disabled={busy || !guardians.length}
       >
         {busy ? t("Saving…") : t("Save family changes")}
       </button>
