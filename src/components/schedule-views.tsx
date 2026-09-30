@@ -44,6 +44,7 @@ import {
 } from "@/lib/schedule-state";
 import { AddressInput, type AddressValue } from "@/components/address-input";
 import { MemberAvatar } from "@/components/member-avatar";
+import { ActionMenu } from "@/components/action-menu";
 import { Sheet } from "@/components/sheet";
 import {
   coverageMood,
@@ -170,7 +171,41 @@ function useMutation(groupId: string, offline = false) {
     }
   }
 
-  return { busyKey, error, message, mutate };
+  // Same reporting and refresh as mutate(), for endpoints addressed by a full
+  // URL rather than a group resource name.
+  async function request(
+    url: string,
+    method: string,
+    body: unknown,
+    key: string,
+  ) {
+    setBusyKey(key);
+    setError("");
+    setMessage("");
+    try {
+      if (offline || !navigator.onLine) {
+        throw new Error(t("Reconnect to make changes."));
+      }
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      await readResult(response);
+      setMessage(method === "DELETE" ? t("Removed.") : t("Saved."));
+      router.refresh();
+      return true;
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? t(caught.message) : t("Change failed."),
+      );
+      return false;
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  return { busyKey, error, message, mutate, request };
 }
 
 function RidesSchedule({
@@ -1745,6 +1780,39 @@ function TeamSchedule({
   const [householdError, setHouseholdError] = useState("");
   const counts = driveCounts(schedule);
 
+  async function removeMember(rosterEntryId: string, name: string) {
+    if (
+      !window.confirm(
+        t("Remove {{name}} from the group? Their past rides are kept.", {
+          name,
+        }),
+      )
+    ) {
+      return;
+    }
+    const removed = await mutation.request(
+      `/api/groups/${groupId}/roster/${rosterEntryId}`,
+      "DELETE",
+      undefined,
+      `remove-${rosterEntryId}`,
+    );
+    if (!removed) return;
+    // Someone added by mistake, with no rides to their name, can be deleted
+    // outright so the list does not keep a removed row forever.
+    if (
+      window.confirm(
+        t("Also delete {{name}} permanently? This cannot be undone.", { name }),
+      )
+    ) {
+      await mutation.request(
+        `/api/groups/${groupId}/roster/${rosterEntryId}?purge=1`,
+        "DELETE",
+        undefined,
+        `purge-${rosterEntryId}`,
+      );
+    }
+  }
+
   async function saveHouseholdDetails(input: FamilyDetailsInput) {
     setSavingHousehold(true);
     setHouseholdError("");
@@ -2150,6 +2218,9 @@ function TeamSchedule({
                   `leave-${rosterEntryId}`,
                 )
               }
+              onRemove={(rosterEntryId, name) =>
+                void removeMember(rosterEntryId, name)
+              }
             />
           ))}
         </div>
@@ -2202,6 +2273,7 @@ function HouseholdRow({
   onEdit,
   onJoin,
   onLeave,
+  onRemove,
 }: {
   household: GroupSchedule["households"][number];
   members: AppRosterEntry[];
@@ -2217,6 +2289,7 @@ function HouseholdRow({
   onEdit: () => void;
   onJoin: (rosterEntryId: string, householdId: string) => void;
   onLeave: (rosterEntryId: string) => void;
+  onRemove: (rosterEntryId: string, name: string) => void;
 }) {
   const { t } = useI18n();
   // A household of one is really just a person who has not been grouped yet,
@@ -2252,102 +2325,80 @@ function HouseholdRow({
           <div className="household-member-name">
             <strong>{member.displayName}</strong>
             <span>{member.phone ?? t("Phone hidden")}</span>
-            {canManage && onMemberPhoto && (
-              <span className="image-actions">
-                <label className="text-button image-upload-button">
-                  <ImagePlus size={15} aria-hidden="true" />
+          </div>
+          {(member.role === "admin" || member.role === "owner") && (
+            <small className="household-member-role">{t(member.role)}</small>
+          )}
+          {canManage && (
+            <>
+              <label
+                className="icon-button member-photo-button"
+                title={member.photoUrl ? t("Change photo") : t("Add photo")}
+              >
+                <ImagePlus size={16} aria-hidden="true" />
+                <span className="member-photo-label">
                   {uploadingImage === `member-${member.id}`
                     ? t("Uploading…")
                     : member.photoUrl
                       ? t("Change photo")
                       : t("Add photo")}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={Boolean(uploadingImage)}
-                    onChange={(event) => {
-                      const image = event.target.files?.[0];
-                      event.target.value = "";
-                      if (image) onMemberPhoto(member.id, image);
-                    }}
-                  />
-                </label>
-                {member.photoUrl && onMemberPhotoRemove && (
-                  <button
-                    className="text-button"
-                    type="button"
-                    disabled={Boolean(uploadingImage)}
-                    onClick={() => onMemberPhotoRemove(member.id)}
-                  >
-                    {t("Remove photo")}
-                  </button>
-                )}
-              </span>
-            )}
-          </div>
-          {canManage &&
-            onPromote &&
-            (member.role === "admin" || member.role === "owner" ? (
-              <small className="household-member-role">{t(member.role)}</small>
-            ) : (
-              <button
-                className="text-button make-admin-link"
-                type="button"
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={Boolean(uploadingImage) || !onMemberPhoto}
+                  onChange={(event) => {
+                    const image = event.target.files?.[0];
+                    event.target.value = "";
+                    if (image) onMemberPhoto?.(member.id, image);
+                  }}
+                />
+              </label>
+              <ActionMenu
+                label={t("Actions for {{name}}", { name: member.displayName })}
                 disabled={busy}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      t("Make {{name}} an organizer?", {
-                        name: member.displayName,
-                      }),
-                    )
-                  ) {
-                    onPromote(member.id, "admin");
-                  }
-                }}
-              >
-                {t("Make organizer")}
-              </button>
-            ))}
-          {canManage && (
-            <span className="household-member-actions">
-              {single && otherHouseholds.length > 0 ? (
-                <label className="household-join">
-                  <span className="household-join-label">{t("Join")}</span>
-                  <select
-                    className="input"
-                    value=""
-                    disabled={busy}
-                    aria-label={t("Add {{name}} to a household", {
-                      name: member.displayName,
-                    })}
-                    onChange={(event) => {
-                      if (event.target.value) {
-                        onJoin(member.id, event.target.value);
+                actions={[
+                  ...otherHouseholds.map((option) => ({
+                    label: t("Join {{household}}", { household: option.name }),
+                    disabled: !single,
+                    onSelect: () => onJoin(member.id, option.id),
+                  })),
+                  {
+                    label: t("Move out"),
+                    disabled: single,
+                    onSelect: () => onLeave(member.id),
+                  },
+                  {
+                    label: t("Make organizer"),
+                    disabled:
+                      !onPromote ||
+                      member.role === "admin" ||
+                      member.role === "owner",
+                    onSelect: () => {
+                      if (
+                        window.confirm(
+                          t("Make {{name}} an organizer?", {
+                            name: member.displayName,
+                          }),
+                        )
+                      ) {
+                        onPromote?.(member.id, "admin");
                       }
-                    }}
-                  >
-                    <option value="">{t("Choose household")}</option>
-                    {otherHouseholds.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                !single && (
-                  <button
-                    className="text-button"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onLeave(member.id)}
-                  >
-                    {t("Move out")}
-                  </button>
-                )
-              )}
-            </span>
+                    },
+                  },
+                  {
+                    label: t("Remove photo"),
+                    disabled: !member.photoUrl || !onMemberPhotoRemove,
+                    onSelect: () => onMemberPhotoRemove?.(member.id),
+                  },
+                  {
+                    label: t("Remove"),
+                    danger: true,
+                    onSelect: () => onRemove(member.id, member.displayName),
+                  },
+                ]}
+              />
+            </>
           )}
         </div>
       ))}

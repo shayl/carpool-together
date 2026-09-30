@@ -45,11 +45,27 @@ async function addRosterEntries(request: Request, groupId: string) {
     role: entry.role,
     active: true,
   }));
-  const { error } = await admin
+  const { data: saved, error } = await admin
     .from("group_access_roster")
-    .upsert(rows, { onConflict: "group_id,phone" });
+    .upsert(rows, { onConflict: "group_id,phone" })
+    .select("id");
 
   if (error) throw error;
+
+  // Re-adding a removed person restores their roster entry; their membership
+  // was suspended when they were removed, so lift that too or their device
+  // stays locked out of the group.
+  const restoredIds = (saved ?? []).map((entry) => entry.id);
+  if (restoredIds.length) {
+    const { error: membershipError } = await admin
+      .from("group_memberships")
+      .update({ status: "active" })
+      .eq("group_id", groupId)
+      .eq("status", "suspended")
+      .in("roster_entry_id", restoredIds);
+    if (membershipError) throw membershipError;
+  }
+
   return Response.json({ added: rows.length });
 }
 

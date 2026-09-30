@@ -268,10 +268,15 @@ export const hebrew: Record<string, string> = {
   "Remove {{name}} from this household?": "להסיר את {{name}} ממשק הבית הזה?",
   "Combine households": "איחוד משקי בית",
   Households: "משקי בית",
-  Join: "צירוף",
-  "Choose household": "בחרו משק בית",
-  "Add {{name}} to a household": "צירוף {{name}} למשק בית",
+  "Actions for {{name}}": "פעולות עבור {{name}}",
+  "Join {{household}}": "צירוף ל{{household}}",
   "Move out": "הוצאה ממשק הבית",
+  "Remove {{name}} from the group? Their past rides are kept.":
+    "להסיר את {{name}} מהקבוצה? הנסיעות הקודמות יישמרו.",
+  "Also delete {{name}} permanently? This cannot be undone.":
+    "למחוק את {{name}} לגמרי? לא ניתן לבטל את הפעולה.",
+  "This person has driven rides. Remove them instead of deleting.":
+    "האדם הזה ביצע נסיעות. הסירו אותו במקום למחוק.",
   "Choose who to move and where.": "בחרו את מי להעביר ולאן.",
   "Who lives together, their pickup address, and how much they have driven.":
     "מי גר יחד, כתובת האיסוף, וכמה נסיעות ביצעו.",
