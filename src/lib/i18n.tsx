@@ -505,6 +505,13 @@ export const hebrew: Record<string, string> = {
     "אמתו קבוצה נוספת באמצעות מספר הטלפון והקוד שלה. הקבוצות שאומתו יופיעו בבורר.",
   "Add group": "הוספת קבוצה",
   "Could not add the group.": "לא ניתן להוסיף את הקבוצה.",
+  Appearance: "מראה",
+  Theme: "ערכת נושא",
+  "Match your device, or pick light or dark for this browser.":
+    "התאמה למכשיר, או בחירה בין מראה בהיר לכהה בדפדפן הזה.",
+  "Match device": "התאמה למכשיר",
+  Light: "בהיר",
+  Dark: "כהה",
   "Group appearance": "מראה הקבוצה",
   "Group icon": "סמל הקבוצה",
   "Shown in the app header and group switcher.":

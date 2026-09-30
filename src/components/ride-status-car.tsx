@@ -41,7 +41,7 @@ export function RideStatusCar({ status }: { status: CoverageStatus }) {
           opacity=".28"
         />
       )}
-      <ellipse cx="44" cy="57" rx="31" ry="4" fill="#31283d" opacity=".13" />
+      <ellipse cx="44" cy="57" rx="31" ry="4" fill="var(--car-ink)" opacity=".13" />
       <path
         d="M17 31 25 12c1-3 4-5 7-5h24c3 0 6 2 7 5l8 19 6 5v15H11V36l6-5Z"
         fill="currentColor"
@@ -53,7 +53,7 @@ export function RideStatusCar({ status }: { status: CoverageStatus }) {
       {mood === "sad" && (
         <g
           fill="none"
-          stroke="#31283d"
+          stroke="var(--car-ink)"
           strokeLinecap="round"
           strokeWidth="2.5"
         >
@@ -68,21 +68,21 @@ export function RideStatusCar({ status }: { status: CoverageStatus }) {
       )}
       {mood === "sad" ? (
         <>
-          <ellipse cx="37" cy="26" rx="3.2" ry="4" fill="#31283d" />
-          <ellipse cx="51" cy="26" rx="3.2" ry="4" fill="#31283d" />
+          <ellipse cx="37" cy="26" rx="3.2" ry="4" fill="var(--car-ink)" />
+          <ellipse cx="51" cy="26" rx="3.2" ry="4" fill="var(--car-ink)" />
           <circle cx="36" cy="24.5" r="1" fill="white" />
           <circle cx="50" cy="24.5" r="1" fill="white" />
         </>
       ) : (
         <>
-          <circle cx="37" cy="25" r="2.5" fill="#31283d" />
-          <circle cx="51" cy="25" r="2.5" fill="#31283d" />
+          <circle cx="37" cy="25" r="2.5" fill="var(--car-ink)" />
+          <circle cx="51" cy="25" r="2.5" fill="var(--car-ink)" />
         </>
       )}
       <path
         d={mouth}
         fill="none"
-        stroke="#31283d"
+        stroke="var(--car-ink)"
         strokeLinecap="round"
         strokeWidth="2.8"
       />
@@ -92,7 +92,7 @@ export function RideStatusCar({ status }: { status: CoverageStatus }) {
       <rect x="34" y="46" width="20" height="5" rx="2.5" fill="white" />
       <path
         d="M17 51v5M71 51v5"
-        stroke="#31283d"
+        stroke="var(--car-ink)"
         strokeLinecap="round"
         strokeWidth="7"
       />

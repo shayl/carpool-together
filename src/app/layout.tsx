@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import { CanonicalLocalOrigin } from "@/components/canonical-local-origin";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { LanguageProvider } from "@/lib/i18n";
+import { themeBootstrapScript } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,6 +30,14 @@ export const metadata: Metadata = {
   },
 };
 
+// Browser chrome follows the active theme; the manifest can only carry one.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#faf9fc" },
+    { media: "(prefers-color-scheme: dark)", color: "#14121a" },
+  ],
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
@@ -37,6 +46,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Applies the saved theme before first paint to avoid a flash. */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <CanonicalLocalOrigin />
         <ServiceWorkerRegistration />
