@@ -688,6 +688,17 @@ button:disabled {
   font-size: 12px;
 }
 
+/* The avatar is a span too, so the row's span rules above would strip its
+   centering and offset the initials out of the circle. */
+.driver-row > .member-avatar,
+.person-row > .member-avatar,
+.family-member > .member-avatar {
+  display: grid;
+  margin-top: 0;
+  color: var(--team);
+  font-size: 12px;
+}
+
 .person-avatar {
   width: 44px;
   height: 44px;
@@ -2256,4 +2267,225 @@ button:disabled {
     transition: none !important;
     animation: none !important;
   }
+}
+
+.household-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.household-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 11px;
+}
+
+.household-row-main {
+  min-width: 0;
+}
+
+.household-row-main strong {
+  display: block;
+}
+
+.household-row-main address {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.household-row-riders {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.household-row-side {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.household-row-drives {
+  color: var(--team);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.merge-member-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.merge-member {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.member-role-select {
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.make-admin-link {
+  color: var(--team);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.household-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.household-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.household-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.household-member-name {
+  min-width: 0;
+  flex: 1;
+}
+
+.household-member-name strong {
+  display: block;
+}
+
+.household-member-name > span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.household-member-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.household-member-role {
+  flex: 0 0 auto;
+  color: var(--team);
+  font-weight: 650;
+}
+
+.household-join {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.household-join-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.household-join select {
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.action-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.action-menu-trigger {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  color: var(--muted);
+}
+
+.action-menu-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  inset-inline-end: 0;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 14px 32px rgb(15 23 42 / 14%);
+}
+
+.action-menu-item {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--foreground);
+  font-size: 14px;
+  text-align: start;
+}
+
+.action-menu-item:hover {
+  background: rgb(15 23 42 / 6%);
+}
+
+.action-menu-item-danger {
+  color: #8f382b;
+}
+
+/* The photo control is a label wrapping a file input, so it needs the
+   icon-button box without the input showing through. */
+.member-photo-button {
+  position: relative;
+  display: grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.member-photo-button input,
+.member-photo-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }

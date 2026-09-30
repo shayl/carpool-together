@@ -67,8 +67,6 @@ export function CarpoolApp({
     "admin" | "coordinator" | "member"
   >("member");
   const [csv, setCsv] = useState("");
-  const [mergeMember, setMergeMember] = useState("");
-  const [intoMember, setIntoMember] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [existingGroupPhone, setExistingGroupPhone] = useState("");
   const [existingGroupPin, setExistingGroupPin] = useState("");
@@ -254,49 +252,27 @@ export function CarpoolApp({
     }
   }
 
-  async function mergeHouseholds(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!mergeMember || !intoMember || mergeMember === intoMember) {
-      setError(t("Choose two different members to combine."));
-      return;
-    }
-    if (
-      !window.confirm(
-        t(
-          "Combine these members into one household? They will share rides and driving responsibility.",
-        ),
-      )
-    ) {
-      return;
-    }
+  async function changeMemberRole(rosterEntryId: string, role: string) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(
-        `/api/groups/${group.id}/households/merge`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mergeRosterEntryId: mergeMember,
-            intoRosterEntryId: intoMember,
-          }),
-        },
-      );
+      const response = await fetch(`/api/groups/${group.id}/roster/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rosterEntryId, role }),
+      });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
         throw new Error(
-          result.error ? t(result.error) : t("Could not combine households."),
+          result.error ? t(result.error) : t("Could not change the role."),
         );
       }
-      setMergeMember("");
-      setIntoMember("");
       router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : t("Could not combine households."),
+          : t("Could not change the role."),
       );
     } finally {
       setLoading(false);
@@ -598,6 +574,21 @@ export function CarpoolApp({
             schedule={group.schedule}
             roster={group.roster}
             currentRosterEntryId={group.currentRosterEntryId}
+            uploadingImage={uploadingImage}
+            onMemberPhoto={(rosterEntryId, image) =>
+              void changeImage(
+                `/api/groups/${group.id}/roster/${rosterEntryId}/photo`,
+                image,
+                `member-${rosterEntryId}`,
+              )
+            }
+            onMemberPhotoRemove={(rosterEntryId) =>
+              void removeImage(
+                `/api/groups/${group.id}/roster/${rosterEntryId}/photo`,
+                `member-${rosterEntryId}`,
+              )
+            }
+            onPromote={changeMemberRole}
             offline={offline}
             initialNavigation={initialNavigation}
             onNavigate={(nextDestination) => {
@@ -608,126 +599,7 @@ export function CarpoolApp({
 
         {destination === "team" && (
           <>
-            <section className="surface-card roster-card">
-              <div className="card-heading">
-                <h2>{t("Group roster")}</h2>
-                <span>
-                  {t("{{count}} people", { count: group.roster.length })}
-                </span>
-              </div>
-              {group.roster.map((member) => (
-                <div className="person-row" key={member.id}>
-                  <MemberAvatar
-                    name={member.displayName}
-                    photoUrl={member.photoUrl}
-                    size={44}
-                    className="person-avatar"
-                  />
-                  <div>
-                    <strong>{member.displayName}</strong>
-                    <span>{member.phone ?? t("Phone hidden")}</span>
-                    {(group.canManageRoster ||
-                      group.currentRosterEntryId === member.id) && (
-                      <span className="image-actions">
-                        <label className="text-button image-upload-button">
-                          <ImagePlus size={15} aria-hidden="true" />
-                          {uploadingImage === `member-${member.id}`
-                            ? t("Uploading…")
-                            : member.photoUrl
-                              ? t("Change photo")
-                              : t("Add photo")}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            disabled={Boolean(uploadingImage)}
-                            onChange={(event) => {
-                              const image = event.target.files?.[0];
-                              event.target.value = "";
-                              if (image) {
-                                void changeImage(
-                                  `/api/groups/${group.id}/roster/${member.id}/photo`,
-                                  image,
-                                  `member-${member.id}`,
-                                );
-                              }
-                            }}
-                          />
-                        </label>
-                        {member.photoUrl && (
-                          <button
-                            className="text-button"
-                            type="button"
-                            disabled={Boolean(uploadingImage)}
-                            onClick={() =>
-                              void removeImage(
-                                `/api/groups/${group.id}/roster/${member.id}/photo`,
-                                `member-${member.id}`,
-                              )
-                            }
-                          >
-                            {t("Remove photo")}
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <small>{t(member.role)}</small>
-                </div>
-              ))}
-              {group.canManageRoster && (
-                <form
-                  className="schedule-form"
-                  onSubmit={mergeHouseholds}
-                >
-                  <h2>{t("Combine households")}</h2>
-                  <p className="text-muted">
-                    {t(
-                      "Put two members in one household so they share the same riders and rides.",
-                    )}
-                  </p>
-                  <label>
-                    {t("Member")}
-                    <select
-                      className="input"
-                      required
-                      value={mergeMember}
-                      onChange={(event) => setMergeMember(event.target.value)}
-                    >
-                      <option value="">{t("Choose member")}</option>
-                      {group.roster.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    {t("Into household of")}
-                    <select
-                      className="input"
-                      required
-                      value={intoMember}
-                      onChange={(event) => setIntoMember(event.target.value)}
-                    >
-                      <option value="">{t("Choose member")}</option>
-                      {group.roster.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    className="primary-button"
-                    disabled={
-                      loading || !mergeMember || !intoMember || mergeMember === intoMember
-                    }
-                  >
-                    {loading ? t("Saving…") : t("Combine")}
-                  </button>
-                </form>
-              )}
-            </section>
+
             {group.canManageRoster && (
               <>
                 <h2 className="settings-section-title">{t("Add members")}</h2>

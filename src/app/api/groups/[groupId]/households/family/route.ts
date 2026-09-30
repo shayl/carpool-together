@@ -59,8 +59,13 @@ export async function PATCH(
       );
     }
 
-    const { admin, userId } = await requireActiveGroupMember(groupId);
-    const householdId = await currentHouseholdId(admin, groupId, userId);
+    const { admin, role, userId } = await requireActiveGroupMember(groupId);
+    const organizer = role === "owner" || role === "admin";
+    // Organizers maintain other families (addresses, riders, guardians), so
+    // they edit any household in the group; everyone else only their own.
+    const householdId = organizer
+      ? input.data.householdId
+      : await currentHouseholdId(admin, groupId, userId);
     if (input.data.householdId !== householdId) {
       return Response.json(
         { error: "You may only update your own household." },
@@ -112,9 +117,15 @@ export async function PATCH(
         guardian.id ? [guardian.id] : [],
       ),
     );
+    // Members cannot remove themselves from their own family. An organizer
+    // editing another household is not one of its guardians, so only that
+    // household's own anchor entry is protected there.
+    const callerRosterEntryId = membership.roster_entry_id as string | null;
     const protectedGuardianIds = [
       household.roster_entry_id,
-      membership.roster_entry_id,
+      callerRosterEntryId && guardianIds.has(callerRosterEntryId)
+        ? callerRosterEntryId
+        : null,
     ].filter((id): id is string => Boolean(id));
 
     if (
@@ -151,15 +162,56 @@ export async function PATCH(
           .eq("id", guardian.id);
         if (error) throw error;
       } else {
-        const { error } = await admin.from("group_access_roster").insert({
-          group_id: groupId,
-          household_id: householdId,
-          display_name: guardian.name,
-          phone: normalizePhone(guardian.phone),
-          role: "member",
-          active: true,
-        });
+        // A trigger gives every new roster entry its own household and rider,
+        // so the insert's household_id is overwritten. Move the guardian into
+        // this family afterwards and drop the household it was given.
+        const { data: added, error } = await admin
+          .from("group_access_roster")
+          .insert({
+            group_id: groupId,
+            household_id: householdId,
+            display_name: guardian.name,
+            phone: normalizePhone(guardian.phone),
+            role: "member",
+            active: true,
+          })
+          .select("id, household_id")
+          .single();
         if (error) throw error;
+
+        // The trigger updates the row in a separate statement, so the value
+        // returned by the insert predates it; re-read to see the real one.
+        const { data: stored, error: storedError } = await admin
+          .from("group_access_roster")
+          .select("household_id")
+          .eq("group_id", groupId)
+          .eq("id", added.id)
+          .single();
+        if (storedError) throw storedError;
+
+        const provisionedHouseholdId = stored.household_id as string | null;
+        if (provisionedHouseholdId && provisionedHouseholdId !== householdId) {
+          const { error: moveError } = await admin
+            .from("group_access_roster")
+            .update({ household_id: householdId })
+            .eq("group_id", groupId)
+            .eq("id", added.id);
+          if (moveError) throw moveError;
+
+          const { error: riderError } = await admin
+            .from("participants")
+            .delete()
+            .eq("group_id", groupId)
+            .eq("household_id", provisionedHouseholdId);
+          if (riderError) throw riderError;
+
+          const { error: cleanupError } = await admin
+            .from("group_households")
+            .delete()
+            .eq("group_id", groupId)
+            .eq("id", provisionedHouseholdId);
+          if (cleanupError) throw cleanupError;
+        }
       }
     }
 
