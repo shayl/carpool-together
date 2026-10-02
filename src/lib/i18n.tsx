@@ -13,6 +13,70 @@ type Locale = "en" | "he";
 type Replacements = Record<string, string | number>;
 
 export const hebrew: Record<string, string> = {
+  Schedule: "לוח זמנים",
+  People: "חברים",
+  Places: "מקומות",
+  "Edit event": "עריכת אירוע",
+  "Edit break": "עריכת הפסקה",
+  "Earlier this week": "מוקדם יותר השבוע",
+  "Calendar options": "אפשרויות לוח השנה",
+  "A little planning. A smoother week.": "קצת תכנון. שבוע רגוע יותר.",
+  "A single date for your group.": "אירוע בתאריך אחד לקבוצה שלכם.",
+  "Add an adult to a household before assigning a driver.": "יש להוסיף מבוגר למשפחה לפני בחירת נהג.",
+  "Add event": "הוספת אירוע",
+  "Change plans": "שינוי התוכניות",
+  "Choose a driver": "בחירת נהג",
+  "Choose another driver": "בחירת נהג אחר",
+  "Assign driver": "שיבוץ נהג",
+  "I'll drive": "אני אסיע",
+  "We're driving": "אנחנו מסיעים",
+  "Next up": "האירוע הבא",
+  "Save plans": "שמירת התוכניות",
+  "Riders & details": "נוסעים ופרטים",
+  "Hide details": "הסתרת פרטים",
+  "Riders & pickup addresses": "נוסעים וכתובות איסוף",
+  "Open month view": "פתיחת תצוגה חודשית",
+  "Open week view": "פתיחת תצוגה שבועית",
+  "Month view": "תצוגה חודשית",
+  "Week view": "תצוגה שבועית",
+  "No rides match this filter": "אין נסיעות התואמות לסינון",
+  "A quiet week": "שבוע רגוע",
+  "Try All to see the full schedule.": "בחרו בהכול כדי לראות את לוח הזמנים המלא.",
+  "Events will appear here when your group adds them.": "אירועים יופיעו כאן כשהקבוצה תוסיף אותם.",
+  "Driving balance": "חלוקת ההסעות",
+  "Driving totals will appear when families join.": "סיכומי ההסעות יופיעו כשמשפחות יצטרפו.",
+  "Each direction counts as one drive. Share the effort over time.": "כל כיוון נחשב להסעה אחת. מתחלקים במאמץ לאורך זמן.",
+  "Group appearance, invitations & access": "מראה הקבוצה, הזמנות וגישה",
+  "Group management": "ניהול הקבוצה",
+  Groups: "קבוצות",
+  "Help & privacy": "עזרה ופרטיות",
+  "How often does your group meet?": "באיזו תדירות הקבוצה נפגשת?",
+  Language: "שפה",
+  "Language, theme, notifications & install": "שפה, עיצוב, התראות והתקנה",
+  "Make yourself at home.": "התאימו את האפליקציה אליכם.",
+  Navigate: "ניווט",
+  "No events this week. Your family plans are up to date.": "אין אירועים השבוע. התוכניות של המשפחה מעודכנות.",
+  "No upcoming events. Add the next date when you're ready.": "אין אירועים קרובים. אפשר להוסיף את התאריך הבא כשמוכנים.",
+  Preferences: "העדפות",
+  "Quick answers and important information": "תשובות מהירות ומידע חשוב",
+  "Release {{direction}} driven by {{name}}? The ride will need a driver.": "לבטל את ההסעה {{direction}} של {{name}}? יהיה צורך בנהג.",
+  "Repeat on the same day each week.": "חזרה באותו יום בכל שבוע.",
+  "Small tasks. Shared effort.": "משימות קטנות. מאמץ משותף.",
+  "Switch, join or create a group": "מעבר, הצטרפות או יצירת קבוצה",
+  "Team tasks": "משימות הקבוצה",
+  "To change the driver, release this ride, then choose another driver.": "כדי להחליף נהג, בטלו את השיבוץ ואז בחרו נהג אחר.",
+  "Your people, their families, and pickup details.": "חברי הקבוצה, המשפחות ופרטי האיסוף.",
+  "{{count}} drives": "{{count}} הסעות",
+  "Choose Change plans on Rides, or select an event in My family. Attendance, ride there, and ride home are separate choices.": "בחרו שינוי התוכניות בנסיעות, או בחרו אירוע במשפחה שלי. נוכחות, הסעה הלוך והסעה חזור הן בחירות נפרדות.",
+  "Could not connect to live updates. Refresh to see the latest schedule.": "לא ניתן להתחבר לעדכונים חיים. רעננו כדי לראות את לוח הזמנים העדכני.",
+  "Account actions are disabled in the local demo.": "פעולות חשבון אינן זמינות בהדגמה המקומית.",
+  "Local demo · sample data only": "הדגמה מקומית · נתונים לדוגמה בלבד",
+  "Ride claims and family plans work in memory. Reload to reset. No database changes.": "שיבוצי נהגים ותוכניות משפחתיות נשמרים בזיכרון בלבד. רענון מאפס אותם. אין שינויים במסד הנתונים.",
+  "Demo updated. Changes last until you reload.": "ההדגמה עודכנה. השינויים נשמרים עד לרענון.",
+  "Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.": "הדגמה: שמירת פעולות ניהול, כתובות וחשבון אינה זמינה. אפשר לנסות שיבוצי נהגים ותוכניות משפחתיות.",
+  "Map lookup is disabled for demo addresses.": "חיפוש במפה אינו זמין לכתובות לדוגמה.",
+  "Navigation is disabled for demo addresses.": "ניווט אינו זמין לכתובות לדוגמה.",
+  "Notifications and installation are available in the live app, not this local demo.": "התראות והתקנה זמינות באפליקציה האמיתית, ולא בהדגמה המקומית.",
   "App and notifications": "אפליקציה והתראות",
   "Group invitation": "הזמנה לקבוצה",
   "Share group": "שיתוף הקבוצה",
@@ -755,17 +819,16 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         toggleLocale,
       }}
     >
-      <button
-        className="language-switch"
-        type="button"
-        onClick={toggleLocale}
-        aria-label={locale === "en" ? "Switch to Hebrew" : "מעבר לאנגלית"}
-      >
-        {locale === "en" ? "עברית" : "English"}
-      </button>
       {children}
     </I18nContext.Provider>
   );
+}
+
+export function LanguagePicker() {
+  const { locale, toggleLocale } = useI18n();
+  return <button className="secondary-button language-picker" type="button" onClick={toggleLocale} aria-label={locale === "en" ? "Switch to Hebrew" : "מעבר לאנגלית"}>
+    {locale === "en" ? "English · עברית" : "עברית · English"}
+  </button>;
 }
 
 export function useI18n() {

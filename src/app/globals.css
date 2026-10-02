@@ -148,22 +148,6 @@ body {
   font-family: var(--font-geist-sans), Arial, sans-serif;
 }
 
-.language-switch {
-  position: fixed;
-  inset-block-end: 76px;
-  inset-inline-end: 12px;
-  z-index: 100;
-  min-height: 36px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-translucent);
-  padding: 6px 12px;
-  color: var(--team);
-  font-size: 13px;
-  font-weight: 750;
-  box-shadow: var(--shadow-header);
-}
-
 [dir="rtl"] body {
   font-family: Arial, sans-serif;
 }
@@ -2651,4 +2635,514 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Task-first screens share the same quiet surfaces and touch-sized controls. */
+.app-header-inner {
+  align-items: center;
+  flex-direction: row;
+}
+
+.brand-lockup {
+  flex: 1;
+}
+
+.brand-copy {
+  flex: 1;
+}
+
+.group-identity-switcher {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.group-identity-switcher select {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  padding-inline-start: 0;
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.header-actions {
+  width: auto;
+  max-width: 45%;
+  min-width: 0;
+}
+
+.group-switcher {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.group-switcher select {
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.screen-heading {
+  margin-bottom: 22px;
+}
+
+.screen-heading h1 {
+  font-size: clamp(26px, 5vw, 32px);
+}
+
+.schedule-toolbar {
+  align-items: center;
+  gap: 6px;
+}
+
+.schedule-toolbar + .coverage-bar,
+.coverage-bar {
+  margin-block: 4px;
+}
+
+.schedule-toolbar ~ .ride-filters {
+  margin-block: 8px 14px;
+}
+
+.schedule-navigation {
+  flex: 1;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.date-range-button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.coverage-bar {
+  min-height: 44px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 0;
+  color: var(--ok-text);
+  font-size: 13px;
+}
+
+.coverage-bar.coverage-open {
+  color: var(--warn-text);
+}
+
+.weekly-events-card {
+  display: grid;
+  gap: 16px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.weekly-event {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-subtle);
+}
+
+.weekly-event-next {
+  border-color: color-mix(in srgb, var(--team) 50%, var(--border));
+}
+
+.next-up-label {
+  margin: 0;
+  background: var(--accent-tint);
+  padding: 9px 18px;
+  color: var(--team);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.weekly-event-summary {
+  grid-template-columns: 52px minmax(0, 1fr) 44px 16px;
+  gap: 10px;
+  padding: 18px 16px 12px;
+}
+
+.weekly-event-name {
+  gap: 5px;
+}
+
+.weekly-event-name strong,
+.weekly-event-name span {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.weekly-event-name strong {
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.weekly-event-name .event-time {
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 650;
+  direction: ltr;
+  unicode-bidi: isolate;
+  align-self: start;
+}
+
+.weekly-event-name .event-location {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.event-location svg {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.weekly-event-coverage .ride-status-car {
+  width: 44px;
+}
+
+.event-directions {
+  display: grid;
+  gap: 4px;
+  padding: 4px 16px 8px;
+}
+
+.direction-summary {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 12px;
+  background: var(--surface-subtle);
+  padding: 8px 12px;
+}
+
+.direction-summary > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.direction-summary strong {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.direction-summary small {
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+.direction-open small {
+  color: var(--warn-text);
+}
+
+.direction-summary .primary-button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.driving-badge {
+  color: var(--ok-text);
+  font-size: 12px;
+  text-align: end;
+}
+
+.event-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 12px 10px;
+}
+
+.text-button,
+.icon-button,
+.ride-filters button,
+.task-navigation button,
+summary {
+  min-height: 44px;
+}
+
+.icon-button {
+  min-width: 44px;
+}
+
+.event-card-actions .text-button {
+  font-size: 13px;
+}
+
+.earlier-events {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.earlier-events summary {
+  align-content: center;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.earlier-events summary span {
+  margin-inline-start: 6px;
+}
+
+.earlier-events-list {
+  display: grid;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.schedule-form > label.status-choice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.plans-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.status-choice input {
+  flex: 0 0 20px;
+}
+
+.attendance-member > span {
+  display: grid;
+  gap: 3px;
+}
+
+.attendance-member strong {
+  color: var(--foreground);
+  font-size: 16px;
+}
+
+.attendance-member small {
+  color: var(--muted);
+}
+
+.card-heading > div {
+  min-width: 0;
+}
+
+.card-heading > .primary-button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  white-space: nowrap;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.card-heading > .primary-button svg {
+  flex: 0 0 auto;
+}
+
+.pickup-details {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 12px;
+}
+
+.pickup-details summary,
+.settings-task summary {
+  display: list-item;
+  align-content: center;
+  cursor: pointer;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.pickup-details .ride-address-list {
+  padding-bottom: 12px;
+}
+
+.ride-leg-panel + .ride-leg-panel {
+  margin-top: 20px;
+}
+
+.family-event-row {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+  padding: 12px;
+  color: var(--foreground);
+  text-align: start;
+}
+
+.family-event-row small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--team);
+}
+
+.task-navigation {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 5px;
+}
+
+.task-navigation button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  padding: 9px 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.task-navigation button[aria-current="page"] {
+  background: var(--accent-tint);
+  color: var(--team);
+  font-weight: 750;
+}
+
+.balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+}
+
+.balance-row strong {
+  flex-shrink: 0;
+  color: var(--team);
+}
+
+.settings-task {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 8px 16px;
+}
+
+.settings-task > .settings-section-title {
+  display: none;
+}
+
+.settings-task > .surface-card {
+  border: 0;
+  padding: 12px 0;
+}
+
+.settings-signout {
+  margin-top: 20px;
+}
+
+.language-picker {
+  margin-block: 8px;
+}
+
+.preview-banner {
+  border-bottom: 1px solid var(--warn-border);
+  background: var(--warn-surface);
+  padding: 0 20px;
+  color: var(--warn-text);
+  font-size: 12px;
+  text-align: center;
+}
+
+.preview-banner summary {
+  align-content: center;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.preview-banner p {
+  margin: 0 0 12px;
+}
+
+.preview-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.preview-fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+[dir="rtl"] .back-button svg,
+[dir="rtl"] .family-event-row small svg {
+  transform: scaleX(-1);
+}
+
+@media (min-width: 768px) {
+  .event-directions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-navigation button {
+    flex-direction: row;
+    font-size: 14px;
+  }
+
+  .weekly-event-summary {
+    grid-template-columns: 64px minmax(0, 1fr) 44px 16px;
+    padding-inline: 20px;
+  }
+}
+
+@media (max-width: 560px) {
+  .schedule-toolbar > .text-button {
+    width: 100%;
+    justify-content: flex-end;
+    padding-block: 4px;
+  }
+
+  .header-actions {
+    max-width: 48%;
+  }
+
+  .month-day {
+    min-height: 78px;
+    padding: 4px;
+  }
+
+  .month-event {
+    min-height: 44px;
+    padding: 4px 2px;
+  }
 }

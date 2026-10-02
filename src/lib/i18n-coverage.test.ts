@@ -57,6 +57,21 @@ function translatedLiterals(file: string) {
 test("every literal UI translation key has a Hebrew translation", () => {
   const root = path.resolve("src");
   const dynamicUiKeys = [
+    "Schedule",
+    "People",
+    "Places",
+    "Driving balance",
+    "Earlier this week",
+    "Preferences",
+    "Groups",
+    "Group management",
+    "Edit event",
+    "Edit break",
+    "Save plans",
+    "I'll drive",
+    "Hide details",
+    "Month view",
+    "Week view",
     "owner",
     "admin",
     "coordinator",

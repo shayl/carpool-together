@@ -42,6 +42,53 @@ Open `http://localhost:3000`. Use `localhost` consistently during development
 because authentication cookies do not carry over to `127.0.0.1`. Loopback-IP
 browser visits are replaced with the canonical local hostname.
 
+### Simplified task flows
+
+Rides starts with the week, highlights the next event, and shows the driver or
+missing coverage for **each direction**. In the current week, upcoming events
+come first and past events remain under **Earlier this week**; other weeks
+stay chronological. **I'll drive** claims a ride for the
+signed-in adult; **Choose another driver** remains in ride details. **We're
+driving** filters claimed rides, not every event a family attends. Use **Change
+plans** or select a child/event in My family to save attendance and independent
+outbound/return needs together.
+
+Next up uses event wall-clock dates/times in the device's local timezone and
+updates each minute. An ongoing event stays highlighted until its end time;
+at that time it moves into history. If no end time is provided, its start
+time is the cutoff. Events have no timezone field in the current app-data
+contract, so this is not a cross-timezone conversion.
+
+Team organizes existing tools into **Schedule**, **People**, **Places**, and
+**Driving balance**. Add event opens a one-time/repeating choice; authorized
+roster, household, photo, and role actions remain under People. Settings opens
+focused Preferences, Groups, Group management, and Help/privacy pages. Language
+selection is available in Preferences and on sign-in. Verified group selection
+is remembered on the device and checked against current memberships.
+
+### Local sample preview (no backend required)
+
+```powershell
+npm ci
+npm run dev -- --hostname localhost --port 3100
+```
+
+Open `http://localhost:3100/preview`. This development-only route reuses the
+real app components with clearly labeled synthetic groups, adults, riders,
+and events. Claims and attendance update isolated in-memory state and reset
+on reload. Organizer/account/address saves, route launches, notifications,
+map lookup, and installation are disabled in the demo; their real flows
+remain available in the authenticated app. The preview creates no auth
+session, API requests, database writes, or realtime subscriptions. It returns
+not found outside development and does not bypass authentication on `/` or
+any API route.
+
+To validate a production build while keeping the development preview running,
+set `CARPOOL_BUILD_DIR=build` for both `npm run build` and `npm start` in a
+separate shell. This uses the ignored `build` directory instead of overwriting
+the development server's `.next` output. Backend configuration is still
+required for production app routes; the preview is never enabled there.
+
 ## App icons
 
 `public/icon.svg` is the source artwork for the happy carpool icon. Keep the
@@ -52,6 +99,7 @@ The full-bleed background and centered car also support maskable home-screen ico
 ## Validate
 
 ```powershell
+npx next typegen
 npm run typecheck
 npm test
 npm run lint

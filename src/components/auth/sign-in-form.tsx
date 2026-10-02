@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppVersion } from "@/components/app-version";
 import { GeneratedGroupPin } from "@/components/generated-group-pin";
-import { useI18n } from "@/lib/i18n";
+import { LanguagePicker, useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/browser";
 
 export function SignInForm() {
@@ -106,6 +106,7 @@ export function SignInForm() {
     return (
       <main className="auth-page">
         <section className="auth-card">
+          <LanguagePicker />
           <GeneratedGroupPin
             groupName={createdGroup.name}
             pin={createdGroup.pin}
@@ -120,6 +121,7 @@ export function SignInForm() {
   return (
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="sign-in-heading">
+        <LanguagePicker />
         <div className="auth-logo" aria-hidden="true">
           CT
         </div>

@@ -1,7 +1,13 @@
-import { format, startOfWeek } from "date-fns";
+import { format, isValid, parseISO, startOfWeek } from "date-fns";
 
 export type Destination = "rides" | "family" | "team" | "settings";
 export type CalendarDisplay = "week" | "month";
+
+export function calendarCursorDate(date: string, display: CalendarDisplay) {
+  return display === "week"
+    ? format(startOfWeek(parseISO(date), { weekStartsOn: 1 }), "yyyy-MM-dd")
+    : date;
+}
 
 export type NavigationState = {
   destination: Destination;
@@ -33,7 +39,7 @@ export function navigationStateFromSearchParams(
     calendarDisplay:
       searchParams.get("view") === "month" ? "month" : "week",
     calendarDate:
-      date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      date && /^\d{4}-\d{2}-\d{2}$/.test(date) && isValid(parseISO(date))
         ? date
         : format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"),
     currentDate: format(now, "yyyy-MM-dd"),

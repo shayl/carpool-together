@@ -7,6 +7,7 @@ import {
   type AddressSuggestion,
 } from "@/lib/address-suggestions";
 import { useI18n } from "@/lib/i18n";
+import { useAppTransport } from "@/lib/app-transport";
 
 const AddressMapPicker = dynamic(
   () =>
@@ -47,6 +48,7 @@ export function AddressInput({
   maxLength?: number;
 }) {
   const { t } = useI18n();
+  const { preview } = useAppTransport();
   const listId = useId();
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -56,7 +58,7 @@ export function AddressInput({
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    if (query.length < minimumQueryLength) return;
+    if (preview || query.length < minimumQueryLength) return;
 
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -81,7 +83,7 @@ export function AddressInput({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, preview]);
 
   function choose(suggestion: AddressSuggestion) {
     onChange({
@@ -143,12 +145,13 @@ export function AddressInput({
           }}
         />
       </label>
-      <AddressMapPicker
+      {!preview && <AddressMapPicker
         kind={mapKind}
         address={value.address}
         disabled={disabled}
         onSelect={onChange}
-      />
+      />}
+      {preview && <p className="preview-note">{t("Map lookup is disabled for demo addresses.")}</p>}
       {visible && (
         <div className="address-suggestions">
           <ul id={listId} role="listbox">

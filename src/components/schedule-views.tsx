@@ -28,7 +28,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   groupResourceUrl,
@@ -38,7 +38,6 @@ import {
   driveCounts,
   effectiveAttendance,
   eventCoverage,
-  eventDrivers,
   isEventInBreak,
   requiredLegs,
   rideState,
@@ -69,7 +68,19 @@ import type {
 } from "@/lib/schedule-types";
 import { useI18n } from "@/lib/i18n";
 import type { AppRosterEntry } from "@/lib/app-data";
+import { useAppTransport } from "@/lib/app-transport";
 import {
+  eligibleCurrentDriver,
+  matchesRideFilter,
+  namedRideDriver,
+  nextUpcomingEvent,
+  sortedEvents,
+  weekEventsForDisplay,
+  type RideFilter,
+} from "@/lib/schedule-ui";
+import { teamSectionFromParams, type TeamSection } from "@/lib/ui-navigation";
+import {
+  calendarCursorDate,
   navigationStateFromSearchParams,
   type NavigationState,
 } from "@/lib/navigation-state";
@@ -91,6 +102,7 @@ type Props = {
   offline?: boolean;
   initialNavigation: NavigationState;
   onNavigate?: (view: ScheduleView) => void;
+  peopleActions?: ReactNode;
 };
 
 const eventTypes: EventType[] = ["practice", "game", "competition"];
@@ -99,6 +111,17 @@ function displayDate(date: Date, pattern: string, locale: "en" | "he") {
   return format(date, pattern, {
     locale: locale === "he" ? hebrewLocale : enUS,
   });
+}
+
+function useCurrentTime(initialDate: string) {
+  const [now, setNow] = useState(() => parseISO(initialDate));
+  useEffect(() => {
+    const update = () => setNow(new Date());
+    update();
+    const timer = setInterval(update, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
 }
 
 function eventTitle(event: GroupEvent) {
@@ -135,6 +158,7 @@ export function ScheduleViews(props: Props) {
 
 function useMutation(groupId: string, offline = false) {
   const router = useRouter();
+  const transport = useAppTransport();
   const { t } = useI18n();
   const [busyKey, setBusyKey] = useState("");
   const [error, setError] = useState("");
@@ -153,14 +177,14 @@ function useMutation(groupId: string, offline = false) {
       if (offline || !navigator.onLine) {
         throw new Error(t("Reconnect to make changes."));
       }
-      const response = await fetch(groupResourceUrl(groupId, resource), {
+      const response = await transport.request(groupResourceUrl(groupId, resource), {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
       await readResult(response);
-      setMessage(method === "DELETE" ? t("Removed.") : t("Saved."));
-      router.refresh();
+      setMessage(transport.preview ? t("Demo updated. Changes last until you reload.") : method === "DELETE" ? t("Removed.") : t("Saved."));
+      if (!transport.preview) router.refresh();
       return true;
     } catch (caught) {
       setError(
@@ -187,14 +211,14 @@ function useMutation(groupId: string, offline = false) {
       if (offline || !navigator.onLine) {
         throw new Error(t("Reconnect to make changes."));
       }
-      const response = await fetch(url, {
+      const response = await transport.request(url, {
         method,
         headers: { "Content-Type": "application/json" },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       await readResult(response);
-      setMessage(method === "DELETE" ? t("Removed.") : t("Saved."));
-      router.refresh();
+      setMessage(transport.preview ? t("Demo updated. Changes last until you reload.") : method === "DELETE" ? t("Removed.") : t("Saved."));
+      if (!transport.preview) router.refresh();
       return true;
     } catch (caught) {
       setError(
@@ -214,6 +238,7 @@ function RidesSchedule({
   groupName,
   schedule,
   roster,
+  currentRosterEntryId,
   offline,
   initialNavigation,
 }: Props) {
@@ -223,12 +248,12 @@ function RidesSchedule({
     initialNavigation.calendarDisplay,
   );
   const [cursor, setCursor] = useState(() =>
-    parseISO(initialNavigation.calendarDate),
+    parseISO(calendarCursorDate(initialNavigation.calendarDate, initialNavigation.calendarDisplay)),
   );
-  const [filter, setFilter] = useState<"all" | "open" | "mine">("all");
+  const [filter, setFilter] = useState<RideFilter>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const weekEnd = addDays(cursor, 6);
-  const activeEvents = schedule.events.filter(
+  const activeEvents = sortedEvents(schedule.events).filter(
     (event) => !isEventInBreak(schedule, event),
   );
   const visibleEvents =
@@ -241,19 +266,19 @@ function RidesSchedule({
       : activeEvents.filter((event) =>
           isSameMonth(parseISO(event.date), cursor),
         );
-  const filteredEvents = visibleEvents.filter((event) => {
-    if (filter === "all") return true;
-    const rides = requiredLegs(event).map((leg) =>
-      rideState(schedule, event, leg),
-    );
-    return filter === "open"
-      ? rides.some((ride) => ride.open)
-      : rides.some((ride) => ride.mine);
-  });
-  const rides = visibleEvents.flatMap((event) =>
-    requiredLegs(event).map((leg) => rideState(schedule, event, leg)),
+  const filteredEvents = visibleEvents.filter((event) =>
+    matchesRideFilter(schedule, event, filter),
+  );
+  const now = useCurrentTime(initialNavigation.currentDate);
+  const weekEvents = weekEventsForDisplay(filteredEvents, format(cursor, "yyyy-MM-dd"), now);
+  const coverageEvents = display === "week"
+    ? weekEventsForDisplay(visibleEvents, format(cursor, "yyyy-MM-dd"), now).primary
+    : visibleEvents;
+  const rides = coverageEvents.flatMap((event) =>
+    requiredLegs(event).map((leg) => rideState(schedule, event, leg)).filter((ride) => ride.active),
   );
   const open = rides.filter((ride) => ride.open).length;
+  const nextEvent = nextUpcomingEvent(schedule, now);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -268,7 +293,7 @@ function RidesSchedule({
         new URL(window.location.href).searchParams,
       );
       setDisplay(navigation.calendarDisplay);
-      setCursor(parseISO(navigation.calendarDate));
+      setCursor(parseISO(calendarCursorDate(navigation.calendarDate, navigation.calendarDisplay)));
     };
     window.addEventListener("popstate", restoreCalendar);
     return () => window.removeEventListener("popstate", restoreCalendar);
@@ -280,6 +305,22 @@ function RidesSchedule({
         ? addDays(current, direction * 7)
         : addMonths(current, direction),
     );
+  }
+
+  function toggleDisplay() {
+    setDisplay(display === "week" ? "month" : "week");
+    if (display === "month") setCursor(startOfWeek(cursor, { weekStartsOn: 1 }));
+    setFilter("all");
+  }
+
+  function renderEvent(event: GroupEvent) {
+    return <EventCard
+      key={event.id} event={event} schedule={schedule} roster={roster}
+      currentRosterEntryId={currentRosterEntryId} nextUp={nextEvent?.id === event.id}
+      expanded={expanded === event.id}
+      onToggle={() => setExpanded((current) => current === event.id ? null : event.id)}
+      mutation={mutation}
+    />;
   }
 
   function share() {
@@ -301,7 +342,7 @@ function RidesSchedule({
       for (const leg of requiredLegs(event)) {
         const ride = rideState(schedule, event, leg);
         lines.push(
-          `${t(legKey(leg))}: ${ride.household?.name ?? t("OPEN")}`,
+          `${t(legKey(leg))}: ${!ride.active ? t("No rides needed") : namedRideDriver(schedule, roster, event, leg) ?? t("OPEN")}`,
         );
         if (ride.participants.length) {
           lines.push(
@@ -322,46 +363,20 @@ function RidesSchedule({
     <>
       <div className="screen-heading">
         <h1>{t("Rides")}</h1>
-        <p>
-          {display === "week"
-            ? `${displayDate(cursor, "MMM d", locale)}–${displayDate(weekEnd, "MMM d, yyyy", locale)}`
-            : displayDate(cursor, "MMMM yyyy", locale)}
-        </p>
       </div>
       <section className="schedule-toolbar">
-        <div className="ride-filters" role="group" aria-label={t("Calendar view")}>
-          <button
-            type="button"
-            aria-pressed={display === "week"}
-            onClick={() => setDisplay("week")}
-          >
-            {t("Week")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={display === "month"}
-            onClick={() => setDisplay("month")}
-          >
-            {t("Month")}
-          </button>
-        </div>
         <div className="schedule-navigation">
+          <button className="icon-button" type="button" aria-label={t("Previous")} onClick={() => move(-1)}><ChevronLeft size={20} /></button>
           <button
-            className="icon-button"
+            className="date-range-button"
             type="button"
-            aria-label={t("Previous")}
-            onClick={() => move(-1)}
+            onClick={toggleDisplay}
+            aria-label={t(display === "week" ? "Open month view" : "Open week view")}
           >
-            <ChevronLeft size={20} />
-          </button>
-          <button
-            className="text-button"
-            type="button"
-            onClick={() =>
-              setCursor(startOfWeek(new Date(), { weekStartsOn: 1 }))
-            }
-          >
-            {t("Today")}
+            <CalendarDays size={18} />
+            {display === "week"
+              ? `${displayDate(cursor, "MMM d", locale)} – ${displayDate(weekEnd, "MMM d", locale)}`
+              : displayDate(cursor, "MMMM yyyy", locale)}
           </button>
           <button
             className="icon-button"
@@ -372,6 +387,14 @@ function RidesSchedule({
             <ChevronRight size={20} />
           </button>
         </div>
+        <ActionMenu label={t("Calendar options")} actions={[
+          { label: t(display === "week" ? "Month view" : "Week view"), onSelect: toggleDisplay, icon: <CalendarDays size={18} /> },
+          { label: t("Today"), onSelect: () => {
+            setCursor(startOfWeek(new Date(), { weekStartsOn: 1 }));
+            setDisplay("week");
+            setFilter("all");
+          } },
+        ]} />
       </section>
 
       {display === "week" && (
@@ -401,8 +424,8 @@ function RidesSchedule({
                   value === "all"
                     ? "All"
                     : value === "open"
-                      ? "Needs a family"
-                      : "My family",
+                      ? "Needs a driver"
+                      : "We're driving",
                 )}
               </button>
             ))}
@@ -410,14 +433,15 @@ function RidesSchedule({
         </>
       )}
 
-      {mutation.error && <p className="auth-error">{mutation.error}</p>}
-      {mutation.message && <p className="auth-message">{mutation.message}</p>}
+      {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+      {mutation.message && <p className="auth-message" role="status">{mutation.message}</p>}
 
       {display === "month" ? (
         <MonthGrid
           cursor={cursor}
           events={filteredEvents}
           schedule={schedule}
+          roster={roster}
           locale={locale}
           onOpen={(id) => {
             const event = schedule.events.find((item) => item.id === id);
@@ -426,31 +450,26 @@ function RidesSchedule({
               startOfWeek(parseISO(event.date), { weekStartsOn: 1 }),
             );
             setDisplay("week");
+            setFilter("all");
             setExpanded(id);
           }}
         />
       ) : filteredEvents.length ? (
         <section className="weekly-events-card">
-          {filteredEvents.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              schedule={schedule}
-              roster={roster}
-              expanded={expanded === event.id}
-              onToggle={() =>
-                setExpanded((current) => (current === event.id ? null : event.id))
-              }
-              mutation={mutation}
-            />
-          ))}
+          {weekEvents.primary.map(renderEvent)}
+          {weekEvents.earlier.length > 0 && <details className="earlier-events">
+            <summary>{t("Earlier this week")} <span>{weekEvents.earlier.length}</span></summary>
+            <div className="earlier-events-list">{weekEvents.earlier.map(renderEvent)}</div>
+          </details>}
         </section>
       ) : (
         <section className="surface-card">
-          <h2>{t("No events scheduled")}</h2>
+          <RideStatusCar status="neutral" />
+          <h2>{t(visibleEvents.length ? "No rides match this filter" : "A quiet week")}</h2>
           <p className="text-muted">
-            {t("Add an event from the Team tab.")}
+            {t(visibleEvents.length ? "Try All to see the full schedule." : "Events will appear here when your group adds them.")}
           </p>
+          {filter !== "all" && <button className="secondary-button" type="button" onClick={() => setFilter("all")}>{t("All")}</button>}
         </section>
       )}
     </>
@@ -461,12 +480,14 @@ function MonthGrid({
   cursor,
   events,
   schedule,
+  roster,
   locale,
   onOpen,
 }: {
   cursor: Date;
   events: GroupEvent[];
   schedule: GroupSchedule;
+  roster: AppRosterEntry[];
   locale: "en" | "he";
   onOpen: (id: string) => void;
 }) {
@@ -501,7 +522,7 @@ function MonthGrid({
               <time dateTime={date}>{format(day, "d")}</time>
               <div className="month-events">
                 {dayEvents.map((event) => {
-                  const drivers = eventDrivers(schedule, event);
+                  const drivers = [...new Set(requiredLegs(event).map((leg) => namedRideDriver(schedule, roster, event, leg)).filter(Boolean))];
                   return (
                     <button
                       key={event.id}
@@ -532,6 +553,8 @@ function EventCard({
   event,
   schedule,
   roster,
+  currentRosterEntryId,
+  nextUp,
   expanded,
   onToggle,
   mutation,
@@ -539,6 +562,8 @@ function EventCard({
   event: GroupEvent;
   schedule: GroupSchedule;
   roster: AppRosterEntry[];
+  currentRosterEntryId?: string | null;
+  nextUp: boolean;
   expanded: boolean;
   onToggle: () => void;
   mutation: ReturnType<typeof useMutation>;
@@ -554,14 +579,17 @@ function EventCard({
     (participant) => participant.id === selectedParticipantId,
   );
   const coverage = eventCoverage(schedule, event);
-  const drivers = eventDrivers(schedule, event);
-  const openRides = requiredLegs(event).filter(
-    (leg) => rideState(schedule, event, leg).open,
-  ).length;
   const mood = coverageMood(coverage);
+  const currentDriver = eligibleCurrentDriver(roster, currentRosterEntryId);
+  const [choosingLeg, setChoosingLeg] = useState<RideLeg | null>(null);
+  const ownParticipants = schedule.participants.filter(
+    (participant) => participant.householdId === schedule.currentHouseholdId,
+  );
+  const [changingPlans, setChangingPlans] = useState(false);
 
   return (
-    <article className={`weekly-event weekly-event-${mood}`}>
+    <article className={`weekly-event weekly-event-${mood}${nextUp ? " weekly-event-next" : ""}`}>
+      {nextUp && <p className="next-up-label">{t("Next up")}</p>}
       <button
         type="button"
         className="weekly-event-summary"
@@ -574,22 +602,12 @@ function EventCard({
         </span>
         <span className="weekly-event-name">
           <strong>{t(eventTitle(event))}</strong>
-          <span>
-            {event.startTime}
-            {location ? ` · ${location.name}` : ""}
-          </span>
+          <span className="event-time">{event.startTime}{event.endTime ? ` – ${event.endTime}` : ""}</span>
+          {location && <span className="event-location"><MapPin size={14} />{location.name}</span>}
         </span>
         <span className="weekly-event-coverage">
           <RideStatusCar status={coverage} />
-          <span>
-            {coverage === "covered"
-              ? drivers.length === 1
-                ? t("{{name}} is driving", { name: drivers[0] })
-                : t("{{names}} are driving", { names: drivers.join(" · ") })
-              : coverage === "open"
-                ? t("{{count}} rides need a driver", { count: openRides })
-                : t("No carpool needed")}
-          </span>
+          <span className="sr-only">{t(coverage === "covered" ? "All rides covered" : coverage === "open" ? "Needs a driver" : "No carpool needed")}</span>
         </span>
         <ChevronRight
           className={
@@ -598,6 +616,48 @@ function EventCard({
           size={20}
         />
       </button>
+      <div className="event-directions">
+        {requiredLegs(event).map((leg) => {
+          const ride = rideState(schedule, event, leg);
+          const driver = namedRideDriver(schedule, roster, event, leg);
+          return (
+            <div key={leg} className={`direction-summary ${ride.open ? "direction-open" : ""}`}>
+              <span>
+                <strong>{t(legKey(leg))}</strong>
+                <small>{!ride.active ? t("No rides needed") : driver ? t("Driver: {{name}}", { name: driver }) : t("Needs a driver")}</small>
+              </span>
+              {ride.open && (
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={Boolean(mutation.busyKey)}
+                  onClick={() => currentDriver
+                    ? void mutation.mutate("claims", "POST", {
+                        eventId: event.id, leg, driverRosterEntryId: currentDriver.id,
+                      }, `claim-${event.id}-${leg}`)
+                    : setChoosingLeg(leg)}
+                >
+                  <Car size={16} />
+                  {t(currentDriver ? "I'll drive" : "Choose a driver")}
+                </button>
+              )}
+              {ride.mine && <span className="driving-badge">{t("We're driving")}</span>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="event-card-actions">
+        {ownParticipants.length > 0 && (
+          <button type="button" className="text-button" onClick={() => {
+            if (ownParticipants.length === 1) setSelectedParticipantId(ownParticipants[0].id);
+            else setChangingPlans(true);
+          }}><Users size={16} aria-hidden="true" />{t("Change plans")}</button>
+        )}
+        <button className="text-button" type="button" aria-expanded={expanded} onClick={onToggle}>
+          {t(expanded ? "Hide details" : "Riders & details")}
+          <ChevronRight size={16} className={expanded ? "event-chevron-expanded" : "event-chevron"} />
+        </button>
+      </div>
       {expanded && (
         <div className="weekly-event-details">
           <div className="member-avatar-row" aria-label={t("Member ride status")}>
@@ -636,22 +696,64 @@ function EventCard({
               leg={leg}
               schedule={schedule}
               roster={roster}
+              currentRosterEntryId={currentRosterEntryId}
               mutation={mutation}
             />
           ))}
-          {selectedParticipant && (
-            <ParticipantStatusEditor
-              event={event}
-              participant={selectedParticipant}
-              schedule={schedule}
-              mutation={mutation}
-              onClose={() => setSelectedParticipantId(null)}
-            />
-          )}
         </div>
       )}
+      {changingPlans && <Sheet title={t("Change plans")} onClose={() => setChangingPlans(false)}>
+        <p className="text-muted">{t(eventTitle(event))} · {event.date} · {event.startTime}</p>
+        <div className="settings-link-card">
+          {ownParticipants.map((participant) => <button type="button" key={participant.id} onClick={() => {
+            setChangingPlans(false);
+            setSelectedParticipantId(participant.id);
+          }}><MemberAvatar name={participant.name} size={40} /><span>{participant.name}</span><ChevronRight size={18} /></button>)}
+        </div>
+      </Sheet>}
+      {selectedParticipant && (
+        <ParticipantStatusEditor
+          key={`${event.id}-${selectedParticipant.id}`}
+          event={event}
+          participant={selectedParticipant}
+          schedule={schedule}
+          mutation={mutation}
+          onClose={() => setSelectedParticipantId(null)}
+        />
+      )}
+      {choosingLeg && <DriverPicker event={event} leg={choosingLeg} roster={roster} mutation={mutation} onClose={() => setChoosingLeg(null)} />}
     </article>
   );
+}
+
+function DriverPicker({ event, leg, roster, mutation, onClose }: {
+  event: GroupEvent;
+  leg: RideLeg;
+  roster: AppRosterEntry[];
+  mutation: ReturnType<typeof useMutation>;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const [driverId, setDriverId] = useState("");
+  const drivers = roster.filter((member) => member.active && member.householdId);
+  return <Sheet title={t("Choose a driver")} busy={Boolean(mutation.busyKey)} onClose={onClose}>
+    <form className="schedule-form" onSubmit={async (input) => {
+      input.preventDefault();
+      const saved = await mutation.mutate("claims", "POST", {
+        eventId: event.id, leg, driverRosterEntryId: driverId,
+      }, `claim-${event.id}-${leg}`);
+      if (saved) onClose();
+    }}>
+      <p>{t(legKey(leg))} · {t(eventTitle(event))} · {event.date}</p>
+      <label>{t("Driver")}<select className="input" required value={driverId} onChange={(input) => setDriverId(input.target.value)}>
+        <option value="">{t("Choose a driver")}</option>
+        {drivers.map((driver) => <option value={driver.id} key={driver.id}>{driver.displayName}</option>)}
+      </select></label>
+      {!drivers.length && <p className="text-muted">{t("Add an adult to a household before assigning a driver.")}</p>}
+      {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+      <button className="primary-button" disabled={!driverId || Boolean(mutation.busyKey)}>{t(mutation.busyKey ? "Saving…" : "Assign driver")}</button>
+    </form>
+  </Sheet>;
 }
 
 function RideLegPanel({
@@ -659,29 +761,20 @@ function RideLegPanel({
   leg,
   schedule,
   roster,
+  currentRosterEntryId,
   mutation,
 }: {
   event: GroupEvent;
   leg: RideLeg;
   schedule: GroupSchedule;
   roster: AppRosterEntry[];
+  currentRosterEntryId?: string | null;
   mutation: ReturnType<typeof useMutation>;
 }) {
   const { t } = useI18n();
   const ride = rideState(schedule, event, leg);
-  // Drivers are people, not households: every adult attached to a household
-  // can take a ride, and picking one implies their household.
-  const drivers = roster.filter(
-    (member) => member.active && member.householdId,
-  );
-  const [driverId, setDriverId] = useState(
-    () =>
-      drivers.find(
-        (member) => member.householdId === schedule.currentHouseholdId,
-      )?.id ??
-      drivers[0]?.id ??
-      "",
-  );
+  const currentDriver = eligibleCurrentDriver(roster, currentRosterEntryId);
+  const [choosingDriver, setChoosingDriver] = useState(false);
   if (!ride.active) return null;
   const riderHouseholds = [
     ...new Map(
@@ -717,49 +810,46 @@ function RideLegPanel({
             className="secondary-button"
             type="button"
             disabled={Boolean(mutation.busyKey)}
-            onClick={() =>
-              mutation.mutate(
+            onClick={() => {
+              if (!window.confirm(t("Release {{direction}} driven by {{name}}? The ride will need a driver.", {
+                direction: t(legKey(leg)),
+                name: namedRideDriver(schedule, roster, event, leg) ?? t("Assigned family"),
+              }))) return;
+              void mutation.mutate(
                 "claims",
                 "DELETE",
                 { eventId: event.id, leg },
                 `release-${event.id}-${leg}`,
-              )
-            }
+              );
+            }}
           >
             {t("Release ride")}
           </button>
         </div>
       ) : (
         <div className="claim-row">
-          <select
-            className="input"
-            aria-label={t("Driver")}
-            value={driverId}
-            onChange={(item) => setDriverId(item.target.value)}
-          >
-            {drivers.map((driver) => (
-              <option key={driver.id} value={driver.id}>
-                {driver.displayName}
-              </option>
-            ))}
-          </select>
           <button
             className="primary-button"
             type="button"
-            disabled={!driverId || Boolean(mutation.busyKey)}
-            onClick={() =>
-              mutation.mutate(
+            disabled={Boolean(mutation.busyKey)}
+            onClick={() => currentDriver
+              ? void mutation.mutate(
                 "claims",
                 "POST",
-                { eventId: event.id, leg, driverRosterEntryId: driverId },
+                { eventId: event.id, leg, driverRosterEntryId: currentDriver.id },
                 `claim-${event.id}-${leg}`,
-              )
+              ) : setChoosingDriver(true)
             }
           >
-            {t("We'll drive")}
+            {t(currentDriver ? "I'll drive" : "Choose a driver")}
           </button>
+          {currentDriver && <button className="text-button" type="button" onClick={() => setChoosingDriver(true)}>{t("Choose another driver")}</button>}
         </div>
       )}
+      {ride.claim && <p className="text-muted">{t("To change the driver, release this ride, then choose another driver.")}</p>}
+      {choosingDriver && <DriverPicker event={event} leg={leg} roster={roster} mutation={mutation} onClose={() => setChoosingDriver(false)} />}
+      <details className="pickup-details">
+        <summary>{t("Riders & pickup addresses")} · {ride.participants.length}</summary>
       <p className="rider-list">
         {ride.participants.map((participant) => participant.name).join(", ")}
       </p>
@@ -784,6 +874,7 @@ function RideLegPanel({
           </address>
         ))}
       </div>
+      </details>
       {ride.claim && (
         <RouteLauncher groupId={event.groupId} event={event} leg={leg} />
       )}
@@ -801,6 +892,7 @@ function RouteLauncher({
   leg: RideLeg;
 }) {
   const { t } = useI18n();
+  const transport = useAppTransport();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [route, setRoute] = useState<GeoStop[] | null>(null);
@@ -812,7 +904,7 @@ function RouteLauncher({
   const [nextStopIndex, setNextStopIndex] = useState(1);
 
   async function loadRoute() {
-    const response = await fetch(`/api/groups/${groupId}/routes`, {
+    const response = await transport.request(`/api/groups/${groupId}/routes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventId: event.id, leg }),
@@ -893,21 +985,22 @@ function RouteLauncher({
       <button
         className="text-button"
         type="button"
-        disabled={busy}
+        disabled={busy || transport.preview}
         onClick={() => void openRoute()}
       >
         <Route size={17} />
-        {busy ? t("Preparing route…") : t("Open route")}
+        {busy ? t("Preparing route…") : t("Navigate")}
       </button>
       <button
         className="text-button"
         type="button"
-        disabled={busy}
+        disabled={busy || transport.preview}
         onClick={() => void openRoute(true)}
       >
         {t("Change maps app")}
       </button>
       {error && <p className="auth-error">{error}</p>}
+      {transport.preview && <p className="preview-note">{t("Navigation is disabled for demo addresses.")}</p>}
       {choosing && route && (
         <section
           className="route-sheet"
@@ -1056,32 +1149,22 @@ function ParticipantStatusEditor({
   mutation: ReturnType<typeof useMutation>;
   onClose: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const attendance = effectiveAttendance(schedule, event, participant);
-  const save = (patch: Partial<typeof attendance>) =>
-    mutation.mutate(
-      "attendance",
-      "PUT",
-      {
-        eventId: event.id,
-        participantId: participant.id,
-        absent: attendance.absent,
-        optOutTo: attendance.optOutTo,
-        optOutFrom: attendance.optOutFrom,
-        ...patch,
-      },
-      `attendance-${event.id}-${participant.id}`,
-    );
+  const [draft, setDraft] = useState(attendance);
+  const dirty = draft.absent !== attendance.absent ||
+    draft.optOutTo !== attendance.optOutTo || draft.optOutFrom !== attendance.optOutFrom;
 
   return (
-    <section
-      className="participant-status-sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("Ride status for {{name}}", { name: participant.name })}
-    >
-      <div className="participant-status-backdrop" onClick={onClose} />
-      <div className="participant-status-panel">
+    <Sheet title={t("Ride status for {{name}}", { name: participant.name })} busy={Boolean(mutation.busyKey)} onClose={onClose}>
+      <form className="schedule-form plans-form" data-dirty={dirty} onSubmit={async (input) => {
+        input.preventDefault();
+        const saved = await mutation.mutate("attendance", "PUT", {
+          eventId: event.id, participantId: participant.id,
+          absent: draft.absent, optOutTo: draft.optOutTo, optOutFrom: draft.optOutFrom,
+        }, `attendance-${event.id}-${participant.id}`);
+        if (saved) onClose();
+      }}>
         <div className="card-heading">
           <span className="attendance-member">
             <MemberAvatar
@@ -1094,26 +1177,14 @@ function ParticipantStatusEditor({
               <small>{t("Attendance and ride needs")}</small>
             </span>
           </span>
-          <button
-            className="icon-button"
-            type="button"
-            aria-label={t("Close")}
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
         </div>
+        <p className="text-muted">{t(eventTitle(event))} · {displayDate(parseISO(event.date), "EEE, MMM d", locale)} · {event.startTime}</p>
         <label className="status-choice">
           <input
             type="checkbox"
-            checked={attendance.absent}
-            onChange={(input) =>
-              save({
-                absent: input.target.checked,
-                optOutTo: input.target.checked || attendance.optOutTo,
-                optOutFrom: input.target.checked || attendance.optOutFrom,
-              })
-            }
+            checked={draft.absent}
+            disabled={Boolean(mutation.busyKey)}
+            onChange={(input) => setDraft({ ...draft, absent: input.target.checked })}
           />
           <span>
             <strong>{t("Absent")}</strong>
@@ -1124,9 +1195,9 @@ function ParticipantStatusEditor({
           <label className="status-choice">
             <input
               type="checkbox"
-              checked={!attendance.optOutTo && !attendance.absent}
-              disabled={attendance.absent}
-              onChange={(input) => save({ optOutTo: !input.target.checked })}
+              checked={!draft.optOutTo && !draft.absent}
+              disabled={draft.absent || Boolean(mutation.busyKey)}
+              onChange={(input) => setDraft({ ...draft, optOutTo: !input.target.checked })}
             />
             <span>
               <strong>{t("Needs ride there")}</strong>
@@ -1138,9 +1209,9 @@ function ParticipantStatusEditor({
           <label className="status-choice">
             <input
               type="checkbox"
-              checked={!attendance.optOutFrom && !attendance.absent}
-              disabled={attendance.absent}
-              onChange={(input) => save({ optOutFrom: !input.target.checked })}
+              checked={!draft.optOutFrom && !draft.absent}
+              disabled={draft.absent || Boolean(mutation.busyKey)}
+              onChange={(input) => setDraft({ ...draft, optOutFrom: !input.target.checked })}
             />
             <span>
               <strong>{t("Needs ride home")}</strong>
@@ -1148,11 +1219,12 @@ function ParticipantStatusEditor({
             </span>
           </label>
         )}
-        <button className="secondary-button" type="button" onClick={onClose}>
-          {t("Done")}
+        {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+        <button className="primary-button" disabled={Boolean(mutation.busyKey) || !dirty}>
+          {t(mutation.busyKey ? "Saving…" : "Save plans")}
         </button>
-      </div>
-    </section>
+      </form>
+    </Sheet>
   );
 }
 
@@ -1162,11 +1234,11 @@ function FamilySchedule({
   roster,
   currentRosterEntryId,
   offline,
-  onNavigate,
   initialNavigation,
 }: Props) {
   const { t, locale } = useI18n();
   const router = useRouter();
+  const transport = useAppTransport();
   const mutation = useMutation(groupId, offline);
   const household = schedule.households.find(
     (item) => item.id === schedule.currentHouseholdId,
@@ -1183,6 +1255,7 @@ function FamilySchedule({
   const [showFamilyDetails, setShowFamilyDetails] = useState(false);
   const [savingFamily, setSavingFamily] = useState(false);
   const [familyError, setFamilyError] = useState("");
+  const [dailyPlan, setDailyPlan] = useState<{ event: GroupEvent; participant: GroupSchedule["participants"][number] } | null>(null);
   const familyEditButton = useRef<HTMLButtonElement>(null);
   const [startsOn, setStartsOn] = useState(initialNavigation.currentDate);
   const [endsOn, setEndsOn] = useState(initialNavigation.currentDate);
@@ -1192,7 +1265,7 @@ function FamilySchedule({
   const today = initialNavigation.currentDate;
   const familyWeekStart = startOfWeek(parseISO(today), { weekStartsOn: 1 });
   const familyWeekEnd = addDays(familyWeekStart, 6);
-  const familyEvents = schedule.events
+  const familyEvents = sortedEvents(schedule.events)
     .filter(
       (event) =>
         event.date >= format(familyWeekStart, "yyyy-MM-dd") &&
@@ -1239,7 +1312,7 @@ function FamilySchedule({
       if (offline || !navigator.onLine) {
         throw new Error(t("Reconnect to make changes."));
       }
-      const response = await fetch(
+      const response = await transport.request(
         `/api/groups/${groupId}/households/family`,
         {
           method: "PATCH",
@@ -1249,7 +1322,7 @@ function FamilySchedule({
       );
       await readResult(response);
       setShowFamilyDetails(false);
-      router.refresh();
+      if (!transport.preview) router.refresh();
       return true;
     } catch (caught) {
       setFamilyError(
@@ -1309,7 +1382,7 @@ function FamilySchedule({
                       (leg) => rideState(schedule, event, leg).open,
                     ).length;
                     return (
-                      <div className="family-event-row" key={event.id}>
+                      <button className="family-event-row" type="button" key={event.id} onClick={() => setDailyPlan({ event, participant })}>
                         <time dateTime={event.date}>
                           {displayDate(
                             parseISO(event.date),
@@ -1317,7 +1390,7 @@ function FamilySchedule({
                             locale,
                           )}
                         </time>
-                        <strong>{t(eventTitle(event))}</strong>
+                        <strong>{t(eventTitle(event))} · {event.startTime}</strong>
                         <span>
                           {attendance.absent
                             ? t("Not attending")
@@ -1329,22 +1402,22 @@ function FamilySchedule({
                                 ? t("Covered")
                                 : t("No rides needed")}
                         </span>
-                      </div>
+                        <small>{t("Change plans")} <ChevronRight size={14} /></small>
+                      </button>
                     );
                   })}
                 </div>
-                <button
-                  className="text-button family-rides-link"
-                  type="button"
-                  onClick={() => onNavigate?.("rides")}
-                >
-                  {t("Change a daily ride")}
-                </button>
+                {!familyEvents.length && <p className="text-muted">{t("No events this week. Your family plans are up to date.")}</p>}
               </div>
             </div>
           ))}
         </section>
       )}
+      {dailyPlan && <ParticipantStatusEditor
+        key={`${dailyPlan.event.id}-${dailyPlan.participant.id}`}
+        event={dailyPlan.event} participant={dailyPlan.participant}
+        schedule={schedule} mutation={mutation} onClose={() => setDailyPlan(null)}
+      />}
       <section className="surface-card family-section family-absence-card">
         <div>
           <h2>{t("Rider absences")}</h2>
@@ -1435,7 +1508,7 @@ function FamilySchedule({
             </label>
             <button
               className="primary-button"
-              disabled={!selected.length || endsOn < startsOn}
+              disabled={transport.preview || Boolean(mutation.busyKey) || !selected.length || endsOn < startsOn}
             >
               {t("Save absence")}
             </button>
@@ -1471,6 +1544,7 @@ function FamilySchedule({
                 <button
                   className="text-button"
                   type="button"
+                  disabled={transport.preview || Boolean(mutation.busyKey)}
                   onClick={() =>
                     mutation.mutate(
                       "absences",
@@ -1530,8 +1604,8 @@ function FamilySchedule({
           )}
         </section>
       )}
-      {mutation.error && <p className="auth-error">{mutation.error}</p>}
-      {mutation.message && <p className="auth-message">{mutation.message}</p>}
+      {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+      {mutation.message && <p className="auth-message" role="status">{mutation.message}</p>}
     </>
   );
 }
@@ -1564,6 +1638,7 @@ function FamilyEditForm({
   onSubmit: (input: FamilyDetailsInput) => Promise<boolean>;
 }) {
   const { t } = useI18n();
+  const { preview } = useAppTransport();
   const [name, setName] = useState(household.name);
   const [address, setAddress] = useState<AddressValue>({
     address: household.address,
@@ -1754,10 +1829,11 @@ function FamilyEditForm({
       </div>
       <button
         className="primary-button family-save-button"
-        disabled={busy || !guardians.length}
+        disabled={preview || busy || !guardians.length}
       >
         {busy ? t("Saving…") : t("Save family changes")}
       </button>
+      {preview && <p className="preview-note">{t("Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.")}</p>}
       {error && <p className="auth-error">{error}</p>}
     </form>
   );
@@ -1774,12 +1850,15 @@ function TeamSchedule({
   onPromote,
   offline,
   initialNavigation,
+  peopleActions,
 }: Props) {
   const { t } = useI18n();
   const router = useRouter();
+  const transport = useAppTransport();
   const mutation = useMutation(groupId, offline);
+  const [section, setSection] = useState<TeamSection>(initialNavigation.venueToken ? "places" : "schedule");
   const [panel, setPanel] = useState<
-    "event" | "recurring" | "venue" | "break" | null
+    "add" | "event" | "recurring" | "venue" | "break" | null
   >(null);
   const [editingEvent, setEditingEvent] = useState<GroupEvent | null>(null);
   const [editingBreak, setEditingBreak] = useState<
@@ -1791,6 +1870,19 @@ function TeamSchedule({
   const [savingHousehold, setSavingHousehold] = useState(false);
   const [householdError, setHouseholdError] = useState("");
   const counts = driveCounts(schedule);
+  useEffect(() => {
+    const restore = () => setSection(teamSectionFromParams(new URL(window.location.href).searchParams));
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+
+  function openSection(next: TeamSection) {
+    setSection(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("team", next);
+    window.history.pushState(null, "", url);
+  }
 
   async function removeMember(rosterEntryId: string, name: string) {
     if (
@@ -1832,7 +1924,7 @@ function TeamSchedule({
       if (offline || !navigator.onLine) {
         throw new Error(t("Reconnect to make changes."));
       }
-      const response = await fetch(
+      const response = await transport.request(
         `/api/groups/${groupId}/households/family`,
         {
           method: "PATCH",
@@ -1842,7 +1934,7 @@ function TeamSchedule({
       );
       await readResult(response);
       setEditingHousehold(null);
-      router.refresh();
+      if (!transport.preview) router.refresh();
       return true;
     } catch (caught) {
       setHouseholdError(
@@ -1856,7 +1948,7 @@ function TeamSchedule({
 
   async function shareVenue(locationId: string) {
     setShareLink("");
-    const response = await fetch(`/api/groups/${groupId}/venue-shares`, {
+    const response = await transport.request(`/api/groups/${groupId}/venue-shares`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ locationId }),
@@ -1875,9 +1967,18 @@ function TeamSchedule({
     <>
       <div className="screen-heading">
         <h1>{t("Team")}</h1>
-        <p>{t("Schedule, breaks, families, and driving fairness.")}</p>
+        <p>{t("Small tasks. Shared effort.")}</p>
       </div>
-      {canManage && (
+      <nav className="task-navigation" aria-label={t("Team tasks")}>
+        {([
+          ["schedule", "Schedule", CalendarDays],
+          ["people", "People", Users],
+          ["places", "Places", MapPin],
+          ["balance", "Driving balance", Car],
+        ] as const).map(([id, label, Icon]) => <button type="button" key={id} aria-current={section === id ? "page" : undefined} onClick={() => openSection(id)}><Icon size={18} /><span>{t(label)}</span></button>)}
+      </nav>
+      {section === "schedule" && (
+      <>
         <section className="surface-card">
           <div className="card-heading">
             <div>
@@ -1887,37 +1988,30 @@ function TeamSchedule({
               </p>
             </div>
           </div>
-          <div className="schedule-actions">
+          {canManage && <div className="schedule-actions">
             <button
-              className="secondary-button"
+              className="primary-button"
               type="button"
               onClick={() => {
                 setEditingEvent(null);
-                setPanel("event");
+                setPanel("add");
               }}
             >
               <Plus size={18} />
-              {t("One-time event")}
+              {t("Add event")}
             </button>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => setPanel("recurring")}
-            >
-              <CalendarDays size={18} />
-              {t("Recurring weekly events")}
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => setPanel("venue")}
-            >
-              <MapPin size={18} />
-              {t("Add venue")}
-            </button>
-          </div>
-          {panel === "event" && (
+          </div>}
+          {panel === "add" && canManage && <Sheet title={t("Add event")} onClose={() => setPanel(null)}>
+            <p className="text-muted">{t("How often does your group meet?")}</p>
+            <div className="settings-link-card">
+              <button type="button" onClick={() => setPanel("event")}><Plus size={22} /><span><strong>{t("One-time event")}</strong><small>{t("A single date for your group.")}</small></span><ChevronRight size={18} /></button>
+              <button type="button" onClick={() => setPanel("recurring")}><CalendarDays size={22} /><span><strong>{t("Recurring weekly events")}</strong><small>{t("Repeat on the same day each week.")}</small></span><ChevronRight size={18} /></button>
+            </div>
+          </Sheet>}
+          {panel === "event" && canManage && (
+            <Sheet title={t(editingEvent ? "Edit event" : "One-time event")} busy={Boolean(mutation.busyKey)} onClose={() => setPanel(null)}>
             <EventForm
+              key={editingEvent?.id ?? "new-event"}
               groupId={groupId}
               schedule={schedule}
               event={editingEvent}
@@ -1939,8 +2033,11 @@ function TeamSchedule({
                 }
               }}
             />
+            {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+            </Sheet>
           )}
-          {panel === "recurring" && (
+          {panel === "recurring" && canManage && (
+            <Sheet title={t("Recurring weekly events")} busy={Boolean(mutation.busyKey)} onClose={() => setPanel(null)}>
             <RecurringForm
               schedule={schedule}
               busy={Boolean(mutation.busyKey)}
@@ -1955,30 +2052,17 @@ function TeamSchedule({
                 if (saved) setPanel(null);
               }}
             />
-          )}
-          {panel === "venue" && (
-            <VenueForm
-              busy={Boolean(mutation.busyKey)}
-              onCancel={() => setPanel(null)}
-              onSave={async (body) => {
-                const saved = await mutation.mutate(
-                  "locations",
-                  "POST",
-                  body,
-                  "save-location",
-                );
-                if (saved) setPanel(null);
-              }}
-            />
+            {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+            </Sheet>
           )}
           <div className="manage-event-list">
-            {schedule.events.slice(-12).reverse().map((event) => (
+            {sortedEvents(schedule.events).filter((event) => event.date >= initialNavigation.currentDate).map((event) => (
               <div className="period-row" key={event.id}>
                 <span>
                   <strong>{t(eventTitle(event))}</strong>
-                  <small>{event.date}</small>
+                  <small>{event.date} · {event.startTime}</small>
                 </span>
-                <span className="row-actions">
+                {canManage && <span className="row-actions">
                   <button
                     className="text-button"
                     type="button"
@@ -1993,6 +2077,7 @@ function TeamSchedule({
                   <button
                     className="text-button text-danger"
                     type="button"
+                    disabled={transport.preview || Boolean(mutation.busyKey)}
                     onClick={() => {
                       if (window.confirm(t("Delete this event?"))) {
                         void mutation.mutate(
@@ -2007,13 +2092,15 @@ function TeamSchedule({
                     <Trash2 size={16} />
                     {t("Delete")}
                   </button>
-                </span>
+                </span>}
               </div>
             ))}
+            {!schedule.events.some((event) => event.date >= initialNavigation.currentDate) && <p className="text-muted">{t("No upcoming events. Add the next date when you're ready.")}</p>}
           </div>
         </section>
+      </>
       )}
-
+      {section === "places" && (
       <section className="surface-card">
         <div className="card-heading">
           <div>
@@ -2022,8 +2109,14 @@ function TeamSchedule({
               {t("Places your events meet. Open one to see it on a map.")}
             </p>
           </div>
-          <MapPin size={22} />
+          {canManage && <button className="primary-button" type="button" onClick={() => setPanel("venue")}><Plus size={18} />{t("Add venue")}</button>}
         </div>
+        {panel === "venue" && canManage && <Sheet title={t("Add venue")} busy={Boolean(mutation.busyKey)} onClose={() => setPanel(null)}>
+          <VenueForm busy={Boolean(mutation.busyKey)} onCancel={() => setPanel(null)} onSave={async (body) => {
+            if (await mutation.mutate("locations", "POST", body, "save-location")) setPanel(null);
+          }} />
+          {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+        </Sheet>}
         {schedule.locations.length === 0 ? (
           <p className="text-muted">{t("No venues yet.")}</p>
         ) : (
@@ -2032,7 +2125,7 @@ function TeamSchedule({
               <VenueRow
                 key={location.id}
                 location={location}
-                canManage={canManage}
+                canManage={canManage && !transport.preview}
                 busy={Boolean(mutation.busyKey)}
                 onShare={() => shareVenue(location.id)}
                 onSave={(name, next) =>
@@ -2080,7 +2173,7 @@ function TeamSchedule({
             <button
               className="secondary-button"
               disabled={
-                mutation.busyKey === "import-venue" || !importToken.trim()
+                transport.preview || mutation.busyKey === "import-venue" || !importToken.trim()
               }
             >
               {mutation.busyKey === "import-venue"
@@ -2095,7 +2188,8 @@ function TeamSchedule({
           </form>
         )}
       </section>
-
+      )}
+      {section === "schedule" && (
       <section className="surface-card">
         <div className="card-heading">
           <div>
@@ -2119,6 +2213,7 @@ function TeamSchedule({
           </button>
         </div>
         {panel === "break" && (
+          <Sheet title={t(editingBreak ? "Edit break" : "Add break")} busy={Boolean(mutation.busyKey)} onClose={() => setPanel(null)}>
           <BreakForm
             key={editingBreak?.id ?? "new-break"}
             period={editingBreak}
@@ -2140,6 +2235,8 @@ function TeamSchedule({
               }
             }}
           />
+          {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+          </Sheet>
         )}
         {schedule.breaks.map((period) => (
           <div className="period-row" key={period.id}>
@@ -2163,6 +2260,7 @@ function TeamSchedule({
               <button
                 className="text-button"
                 type="button"
+                disabled={transport.preview || Boolean(mutation.busyKey)}
                 onClick={() =>
                   mutation.mutate(
                     "breaks",
@@ -2178,18 +2276,19 @@ function TeamSchedule({
           </div>
         ))}
       </section>
-
+      )}
+      {section === "people" && (
       <section className="surface-card">
         <div className="card-heading">
           <div>
             <h2>{t("Households")}</h2>
             <p className="text-muted">
               {t(
-                "Who lives together, their pickup address, and how much they have driven.",
+                "Your people, their families, and pickup details.",
               )}
             </p>
           </div>
-          <Users size={22} />
+          {peopleActions ?? <Users size={22} />}
         </div>
         <div className="household-list">
           {counts.map(({ household, count }) => (
@@ -2208,7 +2307,7 @@ function TeamSchedule({
               otherHouseholds={schedule.households.filter(
                 (option) => option.id !== household.id,
               )}
-              busy={Boolean(mutation.busyKey)}
+              busy={transport.preview || Boolean(mutation.busyKey)}
               uploadingImage={uploadingImage}
               onMemberPhoto={onMemberPhoto}
               onMemberPhotoRemove={onMemberPhotoRemove}
@@ -2237,6 +2336,14 @@ function TeamSchedule({
           ))}
         </div>
       </section>
+      )}
+      {section === "balance" && <section className="surface-card">
+        <h2>{t("Driving balance")}</h2>
+        <p className="text-muted">{t("Each direction counts as one drive. Share the effort over time.")}</p>
+        {counts.map(({ household, count }) => <div className="balance-row" key={household.id}><span>{household.name}</span><strong>{t("{{count}} drives", { count })}</strong></div>)}
+        {!counts.length && <p className="text-muted">{t("Driving totals will appear when families join.")}</p>}
+      </section>}
+      {transport.preview && <p className="preview-note">{t("Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.")}</p>}
       {editingHousehold &&
         (() => {
           const target = schedule.households.find(
@@ -2264,8 +2371,8 @@ function TeamSchedule({
             </Sheet>
           );
         })()}
-      {mutation.error && <p className="auth-error">{mutation.error}</p>}
-      {mutation.message && <p className="auth-message">{mutation.message}</p>}
+      {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
+      {mutation.message && <p className="auth-message" role="status">{mutation.message}</p>}
     </>
   );
 }
@@ -2358,7 +2465,7 @@ function HouseholdRow({
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  disabled={Boolean(uploadingImage) || !onMemberPhoto}
+                  disabled={busy || Boolean(uploadingImage) || !onMemberPhoto}
                   onChange={(event) => {
                     const image = event.target.files?.[0];
                     event.target.value = "";
@@ -2575,6 +2682,7 @@ function EventForm({
   onSave: (fields: EventFields) => void;
 }) {
   const { t } = useI18n();
+  const transport = useAppTransport();
   const [date, setDate] = useState(
     event?.date ?? format(new Date(), "yyyy-MM-dd"),
   );
@@ -2600,7 +2708,7 @@ function EventForm({
     setVenueError("");
     try {
       if (!navigator.onLine) throw new Error(t("Reconnect to make changes."));
-      const response = await fetch(`/api/groups/${groupId}/locations`, {
+      const response = await transport.request(`/api/groups/${groupId}/locations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3045,7 +3153,10 @@ function FormActions({
   onCancel: () => void;
 }) {
   const { t } = useI18n();
+  const { preview } = useAppTransport();
   return (
+    <>
+    {preview && <p className="preview-note">{t("Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.")}</p>}
     <div className="confirmation-actions">
       <button
         className="secondary-button"
@@ -3055,9 +3166,10 @@ function FormActions({
       >
         {t("Cancel")}
       </button>
-      <button className="primary-button" disabled={busy}>
+      <button className="primary-button" disabled={busy || preview}>
         {busy ? t("Saving…") : t("Save")}
       </button>
     </div>
+    </>
   );
 }
