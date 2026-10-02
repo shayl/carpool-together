@@ -2,8 +2,12 @@
 
 import { createContext, useContext } from "react";
 
-export type AppTransport = {
-  preview: boolean;
+export type AppTransport = ({
+  preview: false;
+} | {
+  preview: true;
+  refresh: () => Promise<void>;
+}) & {
   request: (url: string, init?: RequestInit) => Promise<Response>;
 };
 

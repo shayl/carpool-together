@@ -1,6 +1,6 @@
 {
   "name": "carpool-together",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test src/lib/*.test.ts",
+    "test:browser": "node tests/pull-refresh.browser.mjs && node tests/compact-events.browser.mjs",
     "typecheck": "tsc --noEmit",
     "recover-pin": "node --env-file=.env.local --import tsx scripts/recover-group-pin.ts"
   },
@@ -35,6 +36,7 @@
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "playwright": "1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5"

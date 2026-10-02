@@ -17,6 +17,7 @@ import {
   Car,
   ImagePlus,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   MapPin,
@@ -28,7 +29,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   groupResourceUrl,
@@ -316,6 +317,7 @@ function RidesSchedule({
   function renderEvent(event: GroupEvent) {
     return <EventCard
       key={event.id} event={event} schedule={schedule} roster={roster}
+      today={format(now, "yyyy-MM-dd")}
       currentRosterEntryId={currentRosterEntryId} nextUp={nextEvent?.id === event.id}
       expanded={expanded === event.id}
       onToggle={() => setExpanded((current) => current === event.id ? null : event.id)}
@@ -360,7 +362,7 @@ function RidesSchedule({
   }
 
   return (
-    <>
+    <div data-submitting={Boolean(mutation.busyKey)}>
       <div className="screen-heading">
         <h1>{t("Rides")}</h1>
       </div>
@@ -472,7 +474,7 @@ function RidesSchedule({
           {filter !== "all" && <button className="secondary-button" type="button" onClick={() => setFilter("all")}>{t("All")}</button>}
         </section>
       )}
-    </>
+    </div>
   );
 }
 
@@ -554,6 +556,7 @@ function EventCard({
   schedule,
   roster,
   currentRosterEntryId,
+  today,
   nextUp,
   expanded,
   onToggle,
@@ -563,6 +566,7 @@ function EventCard({
   schedule: GroupSchedule;
   roster: AppRosterEntry[];
   currentRosterEntryId?: string | null;
+  today: string;
   nextUp: boolean;
   expanded: boolean;
   onToggle: () => void;
@@ -580,8 +584,8 @@ function EventCard({
   );
   const coverage = eventCoverage(schedule, event);
   const mood = coverageMood(coverage);
-  const currentDriver = eligibleCurrentDriver(roster, currentRosterEntryId);
-  const [choosingLeg, setChoosingLeg] = useState<RideLeg | null>(null);
+  const detailsId = useId();
+  const header = useRef<HTMLButtonElement>(null);
   const ownParticipants = schedule.participants.filter(
     (participant) => participant.householdId === schedule.currentHouseholdId,
   );
@@ -591,13 +595,15 @@ function EventCard({
     <article className={`weekly-event weekly-event-${mood}${nextUp ? " weekly-event-next" : ""}`}>
       {nextUp && <p className="next-up-label">{t("Next up")}</p>}
       <button
+        ref={header}
         type="button"
         className="weekly-event-summary"
         aria-expanded={expanded}
+        aria-controls={detailsId}
         onClick={onToggle}
       >
         <span className="weekly-event-date">
-          <strong>{displayDate(parseISO(event.date), "EEE", locale)}</strong>
+          <strong>{event.date === today ? t("Today") : displayDate(parseISO(event.date), "EEE", locale)}</strong>
           <span>{displayDate(parseISO(event.date), "MMM d", locale)}</span>
         </span>
         <span className="weekly-event-name">
@@ -609,57 +615,28 @@ function EventCard({
           <RideStatusCar status={coverage} />
           <span className="sr-only">{t(coverage === "covered" ? "All rides covered" : coverage === "open" ? "Needs a driver" : "No carpool needed")}</span>
         </span>
-        <ChevronRight
+        <ChevronDown
           className={
-            expanded ? "event-chevron event-chevron-expanded" : "event-chevron"
+            expanded ? "event-disclosure-chevron event-disclosure-chevron-expanded" : "event-disclosure-chevron"
           }
           size={20}
         />
       </button>
-      <div className="event-directions">
-        {requiredLegs(event).map((leg) => {
-          const ride = rideState(schedule, event, leg);
-          const driver = namedRideDriver(schedule, roster, event, leg);
-          return (
-            <div key={leg} className={`direction-summary ${ride.open ? "direction-open" : ""}`}>
-              <span>
-                <strong>{t(legKey(leg))}</strong>
-                <small>{!ride.active ? t("No rides needed") : driver ? t("Driver: {{name}}", { name: driver }) : t("Needs a driver")}</small>
-              </span>
-              {ride.open && (
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={Boolean(mutation.busyKey)}
-                  onClick={() => currentDriver
-                    ? void mutation.mutate("claims", "POST", {
-                        eventId: event.id, leg, driverRosterEntryId: currentDriver.id,
-                      }, `claim-${event.id}-${leg}`)
-                    : setChoosingLeg(leg)}
-                >
-                  <Car size={16} />
-                  {t(currentDriver ? "I'll drive" : "Choose a driver")}
-                </button>
-              )}
-              {ride.mine && <span className="driving-badge">{t("We're driving")}</span>}
-            </div>
-          );
-        })}
-      </div>
-      <div className="event-card-actions">
-        {ownParticipants.length > 0 && (
-          <button type="button" className="text-button" onClick={() => {
-            if (ownParticipants.length === 1) setSelectedParticipantId(ownParticipants[0].id);
-            else setChangingPlans(true);
-          }}><Users size={16} aria-hidden="true" />{t("Change plans")}</button>
-        )}
-        <button className="text-button" type="button" aria-expanded={expanded} onClick={onToggle}>
-          {t(expanded ? "Hide details" : "Riders & details")}
-          <ChevronRight size={16} className={expanded ? "event-chevron-expanded" : "event-chevron"} />
-        </button>
-      </div>
-      {expanded && (
-        <div className="weekly-event-details">
+      <div id={detailsId} className="weekly-event-details" hidden={!expanded}>
+        {expanded && <>
+          <div className="event-card-actions">
+            {ownParticipants.length > 0 && <button type="button" className="text-button" onClick={() => {
+              if (ownParticipants.length === 1) setSelectedParticipantId(ownParticipants[0].id);
+              else setChangingPlans(true);
+            }}><Users size={16} aria-hidden="true" />{t("Change plans")}</button>}
+            <button className="text-button event-hide-details" type="button" onClick={() => {
+              onToggle();
+              header.current?.focus();
+            }}>
+              {t("Hide details")}
+              <ChevronDown size={16} className="event-disclosure-chevron-expanded" aria-hidden="true" />
+            </button>
+          </div>
           <div className="member-avatar-row" aria-label={t("Member ride status")}>
             {schedule.participants.map((participant) => {
               const attendance = effectiveAttendance(
@@ -700,8 +677,8 @@ function EventCard({
               mutation={mutation}
             />
           ))}
-        </div>
-      )}
+        </>}
+      </div>
       {changingPlans && <Sheet title={t("Change plans")} onClose={() => setChangingPlans(false)}>
         <p className="text-muted">{t(eventTitle(event))} · {event.date} · {event.startTime}</p>
         <div className="settings-link-card">
@@ -721,7 +698,6 @@ function EventCard({
           onClose={() => setSelectedParticipantId(null)}
         />
       )}
-      {choosingLeg && <DriverPicker event={event} leg={choosingLeg} roster={roster} mutation={mutation} onClose={() => setChoosingLeg(null)} />}
     </article>
   );
 }
@@ -1335,7 +1311,7 @@ function FamilySchedule({
   }
 
   return (
-    <>
+    <div data-submitting={Boolean(mutation.busyKey) || savingFamily}>
       <div className="screen-heading">
         <h1>{t("My family")}</h1>
         <p>{t("Your riders, your plans.")}</p>
@@ -1606,7 +1582,7 @@ function FamilySchedule({
       )}
       {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
       {mutation.message && <p className="auth-message" role="status">{mutation.message}</p>}
-    </>
+    </div>
   );
 }
 
@@ -1964,7 +1940,7 @@ function TeamSchedule({
   }
 
   return (
-    <>
+    <div data-submitting={Boolean(mutation.busyKey) || savingHousehold}>
       <div className="screen-heading">
         <h1>{t("Team")}</h1>
         <p>{t("Small tasks. Shared effort.")}</p>
@@ -2373,7 +2349,7 @@ function TeamSchedule({
         })()}
       {mutation.error && <p className="auth-error" role="alert">{mutation.error}</p>}
       {mutation.message && <p className="auth-message" role="status">{mutation.message}</p>}
-    </>
+    </div>
   );
 }
 

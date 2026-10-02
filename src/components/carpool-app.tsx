@@ -28,9 +28,10 @@ import { MemberAvatar } from "@/components/member-avatar";
 import { ThemePicker } from "@/components/theme-picker";
 import { ScheduleViews } from "@/components/schedule-views";
 import { Sheet } from "@/components/sheet";
+import { PullToRefresh, RefreshFeedback, ScheduleRefreshButton } from "@/components/pull-to-refresh";
 import type { AppGroup } from "@/lib/app-data";
 import { LanguagePicker, useI18n } from "@/lib/i18n";
-import { useAppTransport } from "@/lib/app-transport";
+import { AppTransportContext, useAppTransport, type AppTransport } from "@/lib/app-transport";
 import { availableGroupId, settingsSectionFromParams, type SettingsSection } from "@/lib/ui-navigation";
 import {
   navigationStateFromSearchParams,
@@ -55,7 +56,19 @@ export function CarpoolApp({
   initialNavigation: NavigationState;
 }) {
   const router = useRouter();
-  const transport = useAppTransport();
+  const sourceTransport = useAppTransport();
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const transport = useMemo<AppTransport>(() => ({
+    ...sourceTransport,
+    async request(url, init) {
+      setPendingRequests((count) => count + 1);
+      try {
+        return await sourceTransport.request(url, init);
+      } finally {
+        setPendingRequests((count) => count - 1);
+      }
+    },
+  }), [sourceTransport]);
   const { t } = useI18n();
   const groups = initialGroups;
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
@@ -526,6 +539,13 @@ export function CarpoolApp({
   }
 
   return (
+    <AppTransportContext.Provider value={transport}>
+    <PullToRefresh
+      blocked={loading || Boolean(uploadingImage) || signingOut || pendingRequests > 0}
+      preview={transport.preview}
+      offline={offline}
+      onRefresh={() => transport.preview ? transport.refresh() : router.refresh()}
+    >
     <div
       className="app-shell"
       data-offline={offline}
@@ -554,6 +574,7 @@ export function CarpoolApp({
               )}
               <span>{group.currentMemberName}</span>
             </div>
+            <ScheduleRefreshButton />
           </div>
         </div>
       </header>
@@ -578,6 +599,7 @@ export function CarpoolApp({
       </nav>
 
       <main id="main-content" tabIndex={-1} className="app-main">
+        <RefreshFeedback />
         {error && destination !== "settings" && !showAddMembers && <p className="auth-error" role="alert">{error}</p>}
         {offline && (
           <div className="notice offline-notice" role="status">
@@ -798,6 +820,8 @@ export function CarpoolApp({
         </footer>
       </main>
     </div>
+    </PullToRefresh>
+    </AppTransportContext.Provider>
   );
 }
 
