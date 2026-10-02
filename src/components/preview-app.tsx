@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { CarpoolApp } from "@/components/carpool-app";
 import type { AppGroup } from "@/lib/app-data";
 import { AppTransportContext } from "@/lib/app-transport";
-import { applyPreviewRequest } from "@/lib/preview-data";
+import { applyPreviewRequest, createPreviewGroups } from "@/lib/preview-data";
 import type { NavigationState } from "@/lib/navigation-state";
 import { useI18n } from "@/lib/i18n";
 
@@ -32,7 +32,12 @@ export function PreviewApp({ initialGroups, initialNavigation }: {
     }
   }
 
-  return <AppTransportContext.Provider value={{ preview: true, request }}>
+  async function refresh() {
+    latest.current = createPreviewGroups(new Date());
+    setGroups(latest.current);
+  }
+
+  return <AppTransportContext.Provider value={{ preview: true, request, refresh }}>
     <details className="preview-banner">
       <summary>{t("Local demo · sample data only")}</summary>
       <p>{t("Ride claims and family plans work in memory. Reload to reset. No database changes.")}</p>

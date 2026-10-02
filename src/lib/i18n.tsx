@@ -13,6 +13,15 @@ type Locale = "en" | "he";
 type Replacements = Record<string, string | number>;
 
 export const hebrew: Record<string, string> = {
+  "Pull to refresh": "משכו לרענון",
+  "Release to refresh": "שחררו לרענון",
+  "Refreshing…": "מרעננים…",
+  "Refresh schedule": "רענון לוח הזמנים",
+  "Schedule refreshed.": "לוח הזמנים רוענן.",
+  "Sample schedule reset. No backend requests.": "לוח הזמנים לדוגמה אופס. לא נשלחו בקשות לשרת.",
+  "You're offline. Reconnect to refresh.": "אין חיבור לרשת. התחברו מחדש כדי לרענן.",
+  "Finish or discard your changes before refreshing.": "סיימו או בטלו את השינויים לפני הרענון.",
+  "Could not refresh the schedule. Try again.": "לא ניתן לרענן את לוח הזמנים. נסו שוב.",
   Schedule: "לוח זמנים",
   People: "חברים",
   Places: "מקומות",

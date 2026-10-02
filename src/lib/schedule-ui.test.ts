@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createPreviewGroups } from "./preview-data";
 import { eligibleCurrentDriver, matchesRideFilter, namedRideDriver, nextUpcomingEvent, sortedEvents, weekEventsForDisplay } from "./schedule-ui";
-import { rideState } from "./schedule-state";
+import { eventCoverage, rideState } from "./schedule-state";
 
 const group = createPreviewGroups(new Date(2026, 9, 2, 11))[0];
 
@@ -23,6 +23,29 @@ test("covered outbound and open return remain independent, including filters and
   assert.equal(matchesRideFilter(group.schedule, event, "open"), true);
   assert.equal(rideState(group.schedule, event, "from_event").open, true);
   assert.equal(matchesRideFilter(group.schedule, group.schedule.events[1], "mine"), false);
+});
+
+test("collapsed coverage car is happy only when every active direction is covered", () => {
+  const event = group.schedule.events[0];
+  assert.equal(eventCoverage(group.schedule, event), "open");
+  const covered = {
+    ...group.schedule,
+    claims: [...group.schedule.claims, {
+      id: "return-claim", eventId: event.id, leg: "from_event" as const,
+      householdId: "morgan", driverRosterEntryId: "sam", claimedBy: "demo",
+    }],
+  };
+  assert.equal(eventCoverage(covered, event), "covered");
+  assert.equal(eventCoverage(group.schedule, { ...event, needsFrom: false }), "covered");
+  assert.equal(eventCoverage(covered, { ...event, needsTo: false, needsFrom: false }), "neutral");
+  const absent = {
+    ...covered,
+    attendance: covered.participants.map((participant) => ({
+      eventId: event.id, participantId: participant.id, absent: true,
+      optOutTo: false, optOutFrom: false, updatedAt: "2026-10-02T12:00:00Z",
+    })),
+  };
+  assert.equal(eventCoverage(absent, event), "neutral");
 });
 
 test("we're driving excludes a rider-only family and inactive claims", () => {
