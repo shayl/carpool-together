@@ -2,7 +2,6 @@
 
 import {
   ArrowLeft,
-  CalendarDays,
   BookOpen,
   Car,
   Check,
@@ -28,16 +27,18 @@ import { PushReminderSettings } from "@/components/push-reminder-settings";
 import { MemberAvatar } from "@/components/member-avatar";
 import { ThemePicker } from "@/components/theme-picker";
 import { ScheduleViews } from "@/components/schedule-views";
+import { Sheet } from "@/components/sheet";
 import type { AppGroup } from "@/lib/app-data";
-import { useI18n } from "@/lib/i18n";
+import { LanguagePicker, useI18n } from "@/lib/i18n";
+import { useAppTransport } from "@/lib/app-transport";
+import { availableGroupId, settingsSectionFromParams, type SettingsSection } from "@/lib/ui-navigation";
 import {
   navigationStateFromSearchParams,
   type Destination,
   type NavigationState,
 } from "@/lib/navigation-state";
-import { createClient } from "@/lib/supabase/browser";
 
-type SettingsPage = "about" | "groups" | "help" | null;
+type SettingsPage = SettingsSection | null;
 
 const destinations = [
   { id: "rides", label: "Rides", icon: Car },
@@ -54,6 +55,7 @@ export function CarpoolApp({
   initialNavigation: NavigationState;
 }) {
   const router = useRouter();
+  const transport = useAppTransport();
   const { t } = useI18n();
   const groups = initialGroups;
   const [activeGroupId, setActiveGroupId] = useState(initialGroups[0].id);
@@ -62,6 +64,7 @@ export function CarpoolApp({
   );
   const [settingsPage, setSettingsPage] = useState<SettingsPage>(null);
   const [rosterMode, setRosterMode] = useState<"single" | "bulk">("single");
+  const [showAddMembers, setShowAddMembers] = useState(false);
   const [memberDisplayName, setMemberDisplayName] = useState("");
   const [memberPhone, setMemberPhone] = useState("");
   const [memberRole, setMemberRole] = useState<
@@ -87,18 +90,22 @@ export function CarpoolApp({
     () => groups.find((item) => item.id === activeGroupId) ?? groups[0],
     [activeGroupId, groups],
   );
+  const groupPreferenceKey = `carpool-active-group:${groups.map((item) => item.currentRosterEntryId ?? item.id).sort().join(":")}`;
 
   useEffect(() => {
     const updateOnlineState = () => setOffline(!navigator.onLine);
     const restoreNavigation = () => {
+      const params = new URL(window.location.href).searchParams;
       setDestination(
         navigationStateFromSearchParams(
-          new URL(window.location.href).searchParams,
+          params,
         ).destination,
       );
-      setSettingsPage(null);
+      setSettingsPage(settingsSectionFromParams(params));
+      setActiveGroupId(availableGroupId(groups.map((item) => item.id), params.get("group") ?? window.localStorage.getItem(groupPreferenceKey)));
     };
     updateOnlineState();
+    restoreNavigation();
     window.addEventListener("online", updateOnlineState);
     window.addEventListener("offline", updateOnlineState);
     window.addEventListener("popstate", restoreNavigation);
@@ -107,52 +114,67 @@ export function CarpoolApp({
       window.removeEventListener("offline", updateOnlineState);
       window.removeEventListener("popstate", restoreNavigation);
     };
-  }, []);
+  }, [groups, groupPreferenceKey]);
 
   useEffect(() => {
-    const client = createClient();
+    if (transport.preview) return;
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => {
       clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => router.refresh(), 250);
     };
-    const channel = client.channel(`group-updates-${group.id}`);
-    for (const table of [
-      "group_households",
-      "group_access_roster",
-      "participants",
-      "group_locations",
-      "group_events",
-      "group_event_attendance",
-      "group_ride_claims",
-      "group_breaks",
-      "group_absence_periods",
-      "group_schedule_templates",
-    ]) {
-      channel.on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table,
-          filter: `group_id=eq.${group.id}`,
-        },
-        refresh,
-      );
+    async function subscribe() {
+      const { createClient } = await import("@/lib/supabase/browser");
+      if (disposed) return;
+      const client = createClient();
+      const channel = client.channel(`group-updates-${group.id}`);
+      for (const table of [
+        "group_households",
+        "group_access_roster",
+        "participants",
+        "group_locations",
+        "group_events",
+        "group_event_attendance",
+        "group_ride_claims",
+        "group_breaks",
+        "group_absence_periods",
+        "group_schedule_templates",
+      ]) {
+        channel.on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table,
+            filter: `group_id=eq.${group.id}`,
+          },
+          refresh,
+        );
+      }
+      channel.subscribe();
+      unsubscribe = () => { void client.removeChannel(channel); };
     }
-    channel.subscribe();
+    void subscribe().catch((caught) => {
+      console.error("Could not connect to live updates", caught);
+      if (!disposed) setError(t("Could not connect to live updates. Refresh to see the latest schedule."));
+    });
     return () => {
+      disposed = true;
       clearTimeout(refreshTimer);
-      void client.removeChannel(channel);
+      unsubscribe?.();
     };
-  }, [group.id, router]);
+  }, [group.id, router, transport.preview, t]);
 
   function navigate(nextDestination: Destination, history: "push" | "replace" = "push") {
     setDestination(nextDestination);
     setSettingsPage(null);
+    setShowAddMembers(false);
     resetGroupState();
     const url = new URL(window.location.href);
     url.searchParams.set("tab", nextDestination);
+    url.searchParams.delete("settings");
     window.history[history === "push" ? "pushState" : "replaceState"](
       null,
       "",
@@ -168,7 +190,20 @@ export function CarpoolApp({
 
   function switchGroup(groupId: string, nextDestination: Destination) {
     setActiveGroupId(groupId);
+    window.localStorage.setItem(groupPreferenceKey, groupId);
+    const url = new URL(window.location.href);
+    url.searchParams.set("group", groupId);
+    window.history.replaceState(null, "", url);
     navigate(nextDestination, "replace");
+  }
+
+  function openSettings(page: SettingsPage) {
+    setSettingsPage(page);
+    resetGroupState();
+    const url = new URL(window.location.href);
+    if (page) url.searchParams.set("settings", page);
+    else url.searchParams.delete("settings");
+    window.history.pushState(null, "", url);
   }
 
   async function importRoster() {
@@ -184,7 +219,7 @@ export function CarpoolApp({
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/groups/${group.id}/roster`, {
+      const response = await transport.request(`/api/groups/${group.id}/roster`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -202,7 +237,8 @@ export function CarpoolApp({
         );
       }
       setCsv("");
-      router.refresh();
+      setShowAddMembers(false);
+      if (!transport.preview) router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -219,7 +255,7 @@ export function CarpoolApp({
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/groups/${group.id}/roster`, {
+      const response = await transport.request(`/api/groups/${group.id}/roster`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -241,7 +277,8 @@ export function CarpoolApp({
       setMemberDisplayName("");
       setMemberPhone("");
       setMemberRole("member");
-      router.refresh();
+      setShowAddMembers(false);
+      if (!transport.preview) router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -257,7 +294,7 @@ export function CarpoolApp({
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/groups/${group.id}/roster/role`, {
+      const response = await transport.request(`/api/groups/${group.id}/roster/role`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rosterEntryId, role }),
@@ -285,7 +322,7 @@ export function CarpoolApp({
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/groups", {
+      const response = await transport.request("/api/groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newGroupName }),
@@ -306,7 +343,7 @@ export function CarpoolApp({
       }
       setCreatedGroup({ name: newGroupName, pin: result.pin });
       setNewGroupName("");
-      if (result.groupId) setActiveGroupId(result.groupId);
+      if (result.groupId) switchGroup(result.groupId, "settings");
       router.refresh();
     } catch (caught) {
       setError(
@@ -325,12 +362,12 @@ export function CarpoolApp({
     setError("");
     try {
       const { data, error: sessionError } =
-        await createClient().auth.getSession();
+        await (await import("@/lib/supabase/browser")).createClient().auth.getSession();
       if (sessionError) throw sessionError;
       const accessToken = data.session?.access_token;
       if (!accessToken) throw new Error(t("Sign-in required."));
 
-      const response = await fetch("/api/login", {
+      const response = await transport.request("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -352,8 +389,7 @@ export function CarpoolApp({
 
       setExistingGroupPhone("");
       setExistingGroupPin("");
-      setActiveGroupId(result.groupId);
-      navigate("rides");
+      switchGroup(result.groupId, "rides");
       setSettingsPage(null);
       router.refresh();
     } catch (caught) {
@@ -372,7 +408,7 @@ export function CarpoolApp({
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/groups/${group.id}`, {
+      const response = await transport.request(`/api/groups/${group.id}`, {
         method: "DELETE",
       });
       const result = (await response.json()) as { error?: string };
@@ -382,8 +418,8 @@ export function CarpoolApp({
         );
       }
       const nextGroup = groups.find((item) => item.id !== group.id);
-      if (nextGroup) setActiveGroupId(nextGroup.id);
-      navigate(nextGroup ? "settings" : "rides");
+      if (nextGroup) switchGroup(nextGroup.id, "settings");
+      else navigate("rides");
       setShowDeleteGroup(false);
       setDeleteConfirmation("");
       router.refresh();
@@ -397,6 +433,10 @@ export function CarpoolApp({
   }
 
   async function signOut() {
+    if (transport.preview) {
+      setError(t("Account actions are disabled in the local demo."));
+      return;
+    }
     setSigningOut(true);
     if ("serviceWorker" in navigator) {
       try {
@@ -421,7 +461,7 @@ export function CarpoolApp({
         );
       }
     }
-    const { error: signOutError } = await createClient().auth.signOut();
+    const { error: signOutError } = await (await import("@/lib/supabase/browser")).createClient().auth.signOut();
     if (signOutError) {
       setError(signOutError.message);
       setSigningOut(false);
@@ -440,7 +480,7 @@ export function CarpoolApp({
     try {
       const formData = new FormData();
       formData.set("image", image);
-      const response = await fetch(endpoint, {
+      const response = await transport.request(endpoint, {
         method: "PATCH",
         body: formData,
       });
@@ -466,7 +506,7 @@ export function CarpoolApp({
     setUploadingImage(key);
     setError("");
     try {
-      const response = await fetch(endpoint, { method: "DELETE" });
+      const response = await transport.request(endpoint, { method: "DELETE" });
       const result = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
@@ -489,7 +529,6 @@ export function CarpoolApp({
     <div
       className="app-shell"
       data-offline={offline}
-      style={{ "--team": group.accent } as React.CSSProperties}
     >
       <a className="skip-link" href="#main-content">
         {t("Skip to content")}
@@ -504,35 +543,17 @@ export function CarpoolApp({
               className="team-logo"
             />
             <div className="brand-copy">
-              <p>{t("{{group}} Carpool", { group: group.name })}</p>
+              {groups.length === 1 ? <p>{group.name}</p> : (
+                <label className="group-switcher group-identity-switcher">
+                  <span className="sr-only">{t("Active group")}</span>
+                  <select value={group.id} onChange={(event) => switchGroup(event.target.value, "rides")}>
+                    {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </label>
+              )}
               <span>{group.currentMemberName}</span>
             </div>
-          </div>
-          <div className="header-actions">
-            <label className="group-switcher">
-              <span className="sr-only">{t("Active group")}</span>
-              <select
-                value={activeGroupId}
-                onChange={(event) => switchGroup(event.target.value, "rides")}
-              >
-                {groups.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={16} aria-hidden="true" />
-            </label>
-            <button
-              className="icon-button"
-              type="button"
-              aria-label={t("Sign out")}
-              title={t("Sign out")}
-              disabled={signingOut}
-              onClick={signOut}
-            >
-              <LogOut size={19} aria-hidden="true" />
-            </button>
           </div>
         </div>
       </header>
@@ -557,6 +578,7 @@ export function CarpoolApp({
       </nav>
 
       <main id="main-content" tabIndex={-1} className="app-main">
+        {error && destination !== "settings" && !showAddMembers && <p className="auth-error" role="alert">{error}</p>}
         {offline && (
           <div className="notice offline-notice" role="status">
             {t(
@@ -568,6 +590,7 @@ export function CarpoolApp({
           destination === "family" ||
           destination === "team") && (
           <ScheduleViews
+            key={`${group.id}-${destination}`}
             groupId={group.id}
             groupName={group.name}
             canManage={group.canManageRoster}
@@ -595,16 +618,19 @@ export function CarpoolApp({
             onNavigate={(nextDestination) => {
               navigate(nextDestination);
             }}
+            peopleActions={group.canManageRoster ? <button className="primary-button" type="button" onClick={() => {
+              setError("");
+              setShowAddMembers(true);
+            }}><Users size={18} />{t("Add person")}</button> : undefined}
           />
         )}
 
-        {destination === "team" && (
-          <>
-
+        {destination === "team" && showAddMembers && (
+          <Sheet title={t("Add people to the group")} busy={loading} onClose={() => setShowAddMembers(false)}>
             {group.canManageRoster && (
               <>
-                <h2 className="settings-section-title">{t("Add members")}</h2>
                 <section className="surface-card import-card">
+                  <fieldset disabled={transport.preview} className="preview-fieldset">
                   <div className="import-heading">
                     <Upload size={22} aria-hidden="true" />
                     <div>
@@ -711,28 +737,29 @@ export function CarpoolApp({
                     </>
                   )}
                   {error && <p className="error">{error}</p>}
+                  </fieldset>
+                  {transport.preview && <p className="preview-note">{t("Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.")}</p>}
                 </section>
               </>
             )}
-          </>
+          </Sheet>
         )}
 
         {destination === "settings" && settingsPage === "about" && (
-          <AboutSettings onBack={() => setSettingsPage(null)} />
-        )}
-        {destination === "settings" && settingsPage === "groups" && (
-          <GroupSettings
-            groups={groups}
-            activeGroupId={activeGroupId}
-            onBack={() => setSettingsPage(null)}
-            onGroup={(groupId) => switchGroup(groupId, "settings")}
-          />
+          <AboutSettings onBack={() => openSettings(null)} />
         )}
         {destination === "settings" && settingsPage === "help" && (
-          <HelpSettings onBack={() => setSettingsPage(null)} />
+          <HelpSettings onBack={() => openSettings(null)} onAbout={() => openSettings("about")} onPrivacy={() => router.push("/privacy")} />
         )}
-        {destination === "settings" && settingsPage === null && (
+        {destination === "settings" && settingsPage !== "about" && settingsPage !== "help" && (
           <SettingsHome
+            section={settingsPage}
+            onSection={openSettings}
+            onBack={() => openSettings(null)}
+            onSignOut={signOut}
+            signingOut={signingOut}
+            onGroup={(groupId) => switchGroup(groupId, "settings")}
+            activeGroupId={group.id}
             group={group}
             groups={groups}
             loading={loading}
@@ -741,11 +768,7 @@ export function CarpoolApp({
             createdGroup={createdGroup}
             showDeleteGroup={showDeleteGroup}
             deleteConfirmation={deleteConfirmation}
-            onGroups={() => setSettingsPage("groups")}
-            onSchedule={() => navigate("rides")}
-            onPrivacy={() => router.push("/privacy")}
-            onHelp={() => setSettingsPage("help")}
-            onAbout={() => setSettingsPage("about")}
+            onHelp={() => openSettings("help")}
             onCreateGroup={createGroup}
             onGroupName={setNewGroupName}
             existingGroupPhone={existingGroupPhone}
@@ -816,7 +839,7 @@ function AboutSettings({ onBack }: { onBack: () => void }) {
   );
 }
 
-function HelpSettings({ onBack }: { onBack: () => void }) {
+function HelpSettings({ onBack, onAbout, onPrivacy }: { onBack: () => void; onAbout: () => void; onPrivacy: () => void }) {
   const { t } = useI18n();
   const sections = [
     [
@@ -825,7 +848,7 @@ function HelpSettings({ onBack }: { onBack: () => void }) {
     ],
     [
       "Attendance and absences",
-      "Tap a member avatar on an event to change that day. Use My family to add a multi-day absence.",
+      "Choose Change plans on Rides, or select an event in My family. Attendance, ride there, and ride home are separate choices.",
     ],
     [
       "Maps and routes",
@@ -859,6 +882,10 @@ function HelpSettings({ onBack }: { onBack: () => void }) {
           </section>
         ))}
       </div>
+      <section className="settings-link-card">
+        <button type="button" onClick={onPrivacy}><ShieldCheck size={22} /><span><strong>{t("Privacy and consent")}</strong><small>{t("Group members can view household addresses for driving and routes.")}</small></span><ChevronDown size={18} /></button>
+        <button type="button" onClick={onAbout}><Info size={22} /><span><strong>{t("About and important notice")}</strong><small>{t("What this service does—and does not—provide.")}</small></span><ChevronDown size={18} /></button>
+      </section>
     </>
   );
 }
@@ -866,25 +893,15 @@ function HelpSettings({ onBack }: { onBack: () => void }) {
 function GroupSettings({
   groups,
   activeGroupId,
-  onBack,
   onGroup,
 }: {
   groups: AppGroup[];
   activeGroupId: string;
-  onBack: () => void;
   onGroup: (id: string) => void;
 }) {
   const { t } = useI18n();
   return (
     <>
-      <button className="text-button back-button" type="button" onClick={onBack}>
-        <ArrowLeft size={18} />
-        {t("Settings")}
-      </button>
-      <div className="screen-heading">
-        <h1>{t("Switch group")}</h1>
-        <p>{t("Choose the group you want to manage.")}</p>
-      </div>
       <section className="settings-link-card" aria-label={t("Your groups")}>
         {groups.map((item) => {
           const current = item.id === activeGroupId;
@@ -917,6 +934,13 @@ function GroupSettings({
 }
 
 type SettingsHomeProps = {
+  section: SettingsPage;
+  onSection: (page: SettingsPage) => void;
+  onBack: () => void;
+  onSignOut: () => void;
+  signingOut: boolean;
+  activeGroupId: string;
+  onGroup: (id: string) => void;
   group: AppGroup;
   groups: AppGroup[];
   loading: boolean;
@@ -925,11 +949,7 @@ type SettingsHomeProps = {
   createdGroup: { name: string; pin: string } | null;
   showDeleteGroup: boolean;
   deleteConfirmation: string;
-  onGroups: () => void;
-  onSchedule: () => void;
-  onPrivacy: () => void;
   onHelp: () => void;
-  onAbout: () => void;
   onCreateGroup: (event: FormEvent<HTMLFormElement>) => void;
   onGroupName: (value: string) => void;
   existingGroupPhone: string;
@@ -949,12 +969,27 @@ type SettingsHomeProps = {
 
 function SettingsHome(props: SettingsHomeProps) {
   const { t } = useI18n();
+  const transport = useAppTransport();
+  if (!props.section) return <>
+    <div className="screen-heading"><h1>{t("Settings")}</h1><p>{t("Make yourself at home.")}</p></div>
+    <section className="settings-link-card">
+      <button type="button" onClick={() => props.onSection("preferences")}><Settings size={22} /><span><strong>{t("Preferences")}</strong><small>{t("Language, theme, notifications & install")}</small></span><ChevronDown size={18} /></button>
+      <button type="button" onClick={() => props.onSection("groups")}><Users size={22} /><span><strong>{t("Groups")}</strong><small>{t("Switch, join or create a group")}</small></span><ChevronDown size={18} /></button>
+      {(props.group.canManageRoster || props.group.role === "owner") && <button type="button" onClick={() => props.onSection("management")}><ShieldCheck size={22} /><span><strong>{t("Group management")}</strong><small>{t("Group appearance, invitations & access")}</small></span><ChevronDown size={18} /></button>}
+      <button type="button" onClick={props.onHelp}><BookOpen size={22} /><span><strong>{t("Help & privacy")}</strong><small>{t("Quick answers and important information")}</small></span><ChevronDown size={18} /></button>
+    </section>
+    <button className="text-button settings-signout" type="button" disabled={props.signingOut || transport.preview} onClick={props.onSignOut}><LogOut size={18} />{t("Sign out")}</button>
+    {transport.preview && <p className="preview-note">{t("Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.")}</p>}
+  </>;
   return (
     <>
+      <button className="text-button back-button" type="button" onClick={props.onBack}><ArrowLeft size={18} />{t("Settings")}</button>
       <div className="screen-heading">
-        <h1>{t("Settings")}</h1>
+        <h1>{t(props.section === "preferences" ? "Preferences" : props.section === "groups" ? "Groups" : "Group management")}</h1>
         <p>{props.group.name}</p>
       </div>
+      {props.section === "preferences" && <>
+      <section className="surface-card"><h3>{t("Language")}</h3><LanguagePicker /></section>
       <h2 className="settings-section-title">{t("Appearance")}</h2>
       <section className="surface-card">
         <h3>{t("Theme")}</h3>
@@ -963,7 +998,10 @@ function SettingsHome(props: SettingsHomeProps) {
         </p>
         <ThemePicker />
       </section>
-      {props.group.canManageRoster && (
+      <h2 className="settings-section-title">{t("App and notifications")}</h2>
+      {transport.preview ? <section className="surface-card"><h3>{t("Install and notifications")}</h3><p className="text-muted">{t("Notifications and installation are available in the live app, not this local demo.")}</p></section> : <><InstallAppCard /><PushReminderSettings /></>}
+      </>}
+      {props.section === "management" && props.group.canManageRoster && (
         <>
           <h2 className="settings-section-title">{t("Group appearance")}</h2>
           <section className="surface-card group-appearance-card">
@@ -989,7 +1027,7 @@ function SettingsHome(props: SettingsHomeProps) {
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    disabled={Boolean(props.uploadingImage)}
+                    disabled={transport.preview || Boolean(props.uploadingImage)}
                     onChange={(event) => {
                       const image = event.target.files?.[0];
                       event.target.value = "";
@@ -1007,7 +1045,7 @@ function SettingsHome(props: SettingsHomeProps) {
                   <button
                     className="text-button"
                     type="button"
-                    disabled={Boolean(props.uploadingImage)}
+                    disabled={transport.preview || Boolean(props.uploadingImage)}
                     onClick={() =>
                       void props.onRemoveImage(
                         `/api/groups/${props.group.id}/icon`,
@@ -1023,73 +1061,19 @@ function SettingsHome(props: SettingsHomeProps) {
           </section>
         </>
       )}
-      <h2 className="settings-section-title">{t("Active group")}</h2>
-      <section className="settings-link-card">
-        <button type="button" onClick={props.onGroups}>
-          <Users size={22} />
-          <span>
-            <strong>{t("Switch group")}</strong>
-            <small>
-              {t("Your account belongs to {{count}} private groups.", {
-                count: props.groups.length,
-              })}
-            </small>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
-        <button type="button" onClick={props.onSchedule}>
-          <CalendarDays size={22} />
-          <span>
-            <strong>{t("Group schedule")}</strong>
-            <small>{t("Open events and ride assignments.")}</small>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
-        <button type="button" onClick={props.onPrivacy}>
-          <ShieldCheck size={22} />
-          <span>
-            <strong>{t("Privacy and consent")}</strong>
-            <small>
-              {t("Group members can view household addresses for driving and routes.")}
-            </small>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
-        <button type="button" onClick={props.onAbout}>
-          <Info size={22} />
-          <span>
-            <strong>{t("About and important notice")}</strong>
-            <small>{t("What this service does—and does not—provide.")}</small>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
-      </section>
-
-      <h2 className="settings-section-title">{t("App and notifications")}</h2>
-      <InstallAppCard />
-      <PushReminderSettings />
-      {props.group.role === "owner" && (
+      {props.section === "management" && props.group.role === "owner" && !transport.preview && (
         <GroupInvitation
           groupId={props.group.id}
           groupName={props.group.name}
         />
       )}
-      <h2 className="settings-section-title">{t("Help and information")}</h2>
-      <section className="settings-link-card">
-        <button type="button" onClick={props.onHelp}>
-          <BookOpen size={22} />
-          <span>
-            <strong>{t("Help")}</strong>
-            <small>
-              {t("Using rides, attendance, notifications, and maps.")}
-            </small>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
-      </section>
-
+      {props.section === "groups" && <>
+      <GroupSettings groups={props.groups} activeGroupId={props.activeGroupId} onGroup={props.onGroup} />
+      <details className="settings-task">
+      <summary>{t("Add an existing group")}</summary>
       <h2 className="settings-section-title">{t("Add an existing group")}</h2>
       <section className="surface-card">
+        <fieldset className="preview-fieldset" disabled={transport.preview}>
         <form className="auth-form" onSubmit={props.onAddExistingGroup}>
           <p className="text-muted">
             {t(
@@ -1129,10 +1113,14 @@ function SettingsHome(props: SettingsHomeProps) {
             {props.loading ? t("Adding…") : t("Add group")}
           </button>
         </form>
+        </fieldset>
       </section>
-
+      </details>
+      <details className="settings-task" open={props.createdGroup ? true : undefined}>
+      <summary>{t("Create another group")}</summary>
       <h2 className="settings-section-title">{t("Create another group")}</h2>
       <section className="surface-card">
+        <fieldset className="preview-fieldset" disabled={transport.preview}>
         {props.createdGroup ? (
           <GeneratedGroupPin
             groupName={props.createdGroup.name}
@@ -1160,16 +1148,18 @@ function SettingsHome(props: SettingsHomeProps) {
             </button>
           </form>
         )}
+        </fieldset>
       </section>
-
-      {props.group.role === "owner" && (
+      </details>
+      </>}
+      {props.section === "management" && props.group.role === "owner" && !transport.preview && (
         <>
           <h2 className="settings-section-title">{t("Access")}</h2>
           <GroupPinSettings groupId={props.group.id} />
         </>
       )}
 
-      {props.group.role === "owner" && (
+      {props.section === "management" && props.group.role === "owner" && !transport.preview && (
         <>
           <h2 className="settings-section-title">{t("Danger zone")}</h2>
           <section className="surface-card danger-card">
@@ -1179,6 +1169,7 @@ function SettingsHome(props: SettingsHomeProps) {
                 {t(
                   "Permanently delete this group, its roster, and all of its carpool data.",
                 )}
+                {transport.preview && <p className="preview-note">{t("Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.")}</p>}
               </p>
             </div>
             {!props.showDeleteGroup ? (

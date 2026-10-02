@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.CARPOOL_BUILD_DIR ?? ".next",
   turbopack: {
     root: process.cwd(),
   },

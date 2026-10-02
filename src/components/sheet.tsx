@@ -60,11 +60,41 @@ export function Sheet({
   return (
     <dialog
       ref={dialog}
+      tabIndex={-1}
       aria-labelledby={titleId}
       className={`app-sheet ${fullScreen ? "app-sheet-full" : ""}`}
       onCancel={(event) => {
         event.preventDefault();
         close();
+      }}
+      onKeyDown={(event) => {
+        if (event.defaultPrevented || event.key !== "Tab") return;
+        const element = event.currentTarget;
+        const controls = Array.from(
+          element.querySelectorAll<HTMLElement>(
+            "a[href], button, input, select, textarea, summary, [tabindex]",
+          ),
+        ).filter(
+          (control) =>
+            control.tabIndex >= 0 &&
+            !control.matches(":disabled") &&
+            control.getClientRects().length > 0,
+        );
+        const first = controls[0];
+        const last = controls.at(-1);
+        if (!first) {
+          event.preventDefault();
+          element.focus();
+        } else if (
+          event.shiftKey &&
+          (document.activeElement === first || document.activeElement === element)
+        ) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }}
     >
       <header className="sheet-heading">
