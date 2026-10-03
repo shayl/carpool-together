@@ -6,7 +6,7 @@
       <stop offset="1" stop-color="#4a39c8"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" fill="url(#carpool-bg)"/>
+  <rect width="512" height="512" rx="96" fill="url(#carpool-bg)"/>
   <g transform="translate(256 256) scale(1.1) translate(-256 -256)">
     <rect x="88" y="238" width="336" height="91" rx="26" fill="#fff6e6"/>
     <path fill="#fff6e6" d="M144 262 L204 150 Q212 141 223 140 L289 140 Q300 141 308 150 L368 262 Z"/>
