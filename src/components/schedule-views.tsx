@@ -69,6 +69,7 @@ import type {
   GroupSchedule,
   RideLeg,
 } from "@/lib/schedule-types";
+import { ScheduleRefreshButton } from "@/components/pull-to-refresh";
 import { useI18n } from "@/lib/i18n";
 import type { AppFamily, AppGroup, AppRosterEntry } from "@/lib/app-data";
 import { useAppTransport } from "@/lib/app-transport";
@@ -383,8 +384,9 @@ function RidesSchedule({
 
   return (
     <div data-submitting={Boolean(mutation.busyKey)}>
-      <div className="screen-heading">
+      <div className="screen-heading screen-heading-row">
         <h1>{t("Rides")}</h1>
+        <ScheduleRefreshButton />
       </div>
       <section className="schedule-toolbar">
         <div className="schedule-navigation">

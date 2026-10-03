@@ -24,7 +24,7 @@ import { PersonalCodeSettings } from "@/components/personal-code-settings";
 import { ThemePicker } from "@/components/theme-picker";
 import { ScheduleViews } from "@/components/schedule-views";
 import { Sheet } from "@/components/sheet";
-import { PullToRefresh, RefreshFeedback, ScheduleRefreshButton } from "@/components/pull-to-refresh";
+import { PullToRefresh, RefreshFeedback } from "@/components/pull-to-refresh";
 import { mergeGroupSchedules } from "@/lib/all-groups-schedule";
 import type { AppAccount, AppFamily, AppGroup } from "@/lib/app-data";
 import { LanguagePicker, useI18n } from "@/lib/i18n";
@@ -498,18 +498,6 @@ export function CarpoolApp({
       <a className="skip-link" href="#main-content">
         {t("Skip to content")}
       </a>
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div className="brand-lockup">
-            <div className="brand-copy">
-              <p>{t("Carpool Together")}</p>
-              <span>{account.displayName}</span>
-            </div>
-            <ScheduleRefreshButton />
-          </div>
-        </div>
-      </header>
-
       <nav className="app-navigation" aria-label={t("Main navigation")}>
         {destinations.map(({ id, label, icon: Icon }) => (
           <button
