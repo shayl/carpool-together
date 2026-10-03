@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { CarpoolApp } from "@/components/carpool-app";
+import { ChangeCodeForm } from "@/components/auth/change-code-form";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { accountForUser, syncAccountMemberships } from "@/lib/account";
 import { loadAppData } from "@/lib/app-data";
@@ -41,6 +42,12 @@ export default async function Home({ searchParams }: HomeProps) {
   const account = await accountForUser(admin, userId);
   if (!account) {
     return <SignInForm />;
+  }
+
+  // The phone-derived starting code is public knowledge, so nothing behind it
+  // opens until it has been replaced.
+  if (account.must_change_code) {
+    return <ChangeCodeForm phone={account.phone} />;
   }
 
   const groups = await loadAppData(userId);

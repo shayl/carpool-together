@@ -694,6 +694,25 @@ export const hebrew: Record<string, string> = {
   "Could not link this device to your groups.":
     "לא ניתן לקשר את המכשיר לקבוצות שלכם.",
   "Sign in again to continue.": "היכנסו שוב כדי להמשיך.",
+  "Personal code": "קוד אישי",
+  "Use your phone number and your personal code.":
+    "השתמשו במספר הטלפון ובקוד האישי שלכם.",
+  "Six-digit code": "קוד בן שש ספרות",
+  "Six digits": "שש ספרות",
+  "Open my rides": "פתיחת הנסיעות שלי",
+  "Signing in for the first time? Your code is the last six digits of this phone number.":
+    "נכנסים בפעם הראשונה? הקוד שלכם הוא שש הספרות האחרונות של מספר הטלפון הזה.",
+  "An organizer adds your phone number to their group. ":
+    "מארגן הקבוצה מוסיף את מספר הטלפון שלכם. ",
+  "Choose your code": "בחרו את הקוד שלכם",
+  "Your code is still the last six digits of your phone number, which anyone could guess. Pick a new one to finish setting up.":
+    "הקוד שלכם עדיין שש הספרות האחרונות של מספר הטלפון, וכל אחד יכול לנחש אותו. בחרו קוד חדש כדי לסיים את ההגדרה.",
+  "Current code": "הקוד הנוכחי",
+  "New code": "קוד חדש",
+  "Repeat new code": "חזרו על הקוד החדש",
+  "Save my code": "שמירת הקוד",
+  "The two codes do not match.": "שני הקודים אינם תואמים.",
+  "Could not change your code.": "לא ניתן לשנות את הקוד.",
   "Add your family details before creating a group.":
     "הוסיפו את פרטי המשפחה לפני יצירת קבוצה.",
   "Choose a new six-digit code.": "בחרו קוד חדש בן שש ספרות.",
