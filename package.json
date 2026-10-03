@@ -10,7 +10,8 @@
     "test": "tsx --test src/lib/*.test.ts",
     "test:browser": "node tests/pull-refresh.browser.mjs && node tests/compact-events.browser.mjs",
     "typecheck": "tsc --noEmit",
-    "recover-pin": "node --env-file=.env.local --import tsx scripts/recover-group-pin.ts"
+    "recover-pin": "node --env-file=.env.local --import tsx scripts/recover-group-pin.ts",
+    "seed-codes": "node --env-file=.env.local --import tsx scripts/seed-initial-codes.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -682,6 +682,23 @@ export const hebrew: Record<string, string> = {
     "מספר הטלפון והקוד תואמים ליותר מקבוצה אחת. בקשו ממארגן לבחור קוד אחר.",
   "Too many sign-in attempts. Try again in 15 minutes.":
     "יותר מדי ניסיונות כניסה. נסו שוב בעוד 15 דקות.",
+  "Enter a valid phone number and personal code.":
+    "הזינו מספר טלפון וקוד אישי תקינים.",
+  "Phone number or personal code is incorrect.":
+    "מספר הטלפון או הקוד האישי שגויים.",
+  "This account is locked after too many attempts. Try again in 15 minutes.":
+    "החשבון ננעל לאחר יותר מדי ניסיונות. נסו שוב בעוד 15 דקות.",
+  "Could not sign in.": "לא ניתן להיכנס.",
+  "Could not link this device to your account.":
+    "לא ניתן לקשר את המכשיר לחשבון שלכם.",
+  "Could not link this device to your groups.":
+    "לא ניתן לקשר את המכשיר לקבוצות שלכם.",
+  "Sign in again to continue.": "היכנסו שוב כדי להמשיך.",
+  "Choose a new six-digit code.": "בחרו קוד חדש בן שש ספרות.",
+  "Choose a six-digit code.": "בחרו קוד בן שש ספרות.",
+  "That is not your current code.": "זה אינו הקוד הנוכחי שלכם.",
+  "Choose a code you have not used before.":
+    "בחרו קוד שלא השתמשתם בו קודם.",
   "Complete every field with valid values.": "מלאו את כל השדות בערכים תקינים.",
   "Group name must contain letters or numbers.":
     "שם הקבוצה חייב לכלול אותיות או מספרים.",
