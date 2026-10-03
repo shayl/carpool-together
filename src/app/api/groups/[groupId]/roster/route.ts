@@ -38,13 +38,32 @@ async function addRosterEntries(request: Request, groupId: string) {
   }
 
   const { admin } = await requireGroupRole(groupId, ["owner", "admin"]);
-  const rows = input.data.entries.map((entry) => ({
-    group_id: groupId,
-    display_name: entry.displayName,
-    phone: normalizePhone(entry.phone),
-    role: entry.role,
-    active: true,
-  }));
+  const phones = input.data.entries.map((entry) => normalizePhone(entry.phone));
+
+  // Linking the phone to its account is what makes the person land in their
+  // own family's household here, instead of a fresh empty one. Someone with
+  // no account yet is left unlinked and adopts the household when they first
+  // sign in.
+  const { data: accounts, error: accountsError } = await admin
+    .from("accounts")
+    .select("id, phone")
+    .in("phone", phones);
+  if (accountsError) throw accountsError;
+
+  const accountByPhone = new Map(
+    (accounts ?? []).map((account) => [account.phone, account.id]),
+  );
+  const rows = input.data.entries.map((entry) => {
+    const phone = normalizePhone(entry.phone);
+    return {
+      group_id: groupId,
+      account_id: accountByPhone.get(phone) ?? null,
+      display_name: entry.displayName,
+      phone,
+      role: entry.role,
+      active: true,
+    };
+  });
   const { data: saved, error } = await admin
     .from("group_access_roster")
     .upsert(rows, { onConflict: "group_id,phone" })

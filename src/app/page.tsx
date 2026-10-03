@@ -1,8 +1,10 @@
 import { connection } from "next/server";
 import { CarpoolApp } from "@/components/carpool-app";
 import { SignInForm } from "@/components/auth/sign-in-form";
+import { accountForUser, syncAccountMemberships } from "@/lib/account";
 import { loadAppData } from "@/lib/app-data";
 import { navigationStateFromSearchParams } from "@/lib/navigation-state";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type HomeProps = {
@@ -31,10 +33,17 @@ export default async function Home({ searchParams }: HomeProps) {
     return <SignInForm />;
   }
 
-  const groups = await loadAppData(userId);
-  if (groups.length === 0) {
+  // An organizer can add this phone to a group at any time; reconciling here
+  // is what makes that group simply appear on the next load.
+  const admin = createAdminClient();
+  await syncAccountMemberships(admin, userId);
+
+  const account = await accountForUser(admin, userId);
+  if (!account) {
     return <SignInForm />;
   }
+
+  const groups = await loadAppData(userId);
 
   return (
     <CarpoolApp

@@ -82,7 +82,7 @@ export async function PATCH(
     ] = await Promise.all([
       admin
         .from("group_households")
-        .select("id, roster_entry_id")
+        .select("id, roster_entry_id, family_id")
         .eq("group_id", groupId)
         .eq("id", householdId)
         .single(),
@@ -261,18 +261,39 @@ export async function PATCH(
       if (error) throw error;
     }
 
-    const { error: householdError } = await admin
-      .from("group_households")
-      .update({
-        name: input.data.name,
-        address: input.data.address,
-        latitude: input.data.latitude,
-        longitude: input.data.longitude,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("group_id", groupId)
-      .eq("id", householdId);
-    if (householdError) throw householdError;
+    const details = {
+      name: input.data.name,
+      address: input.data.address,
+      latitude: input.data.latitude,
+      longitude: input.data.longitude,
+      updated_at: new Date().toISOString(),
+    };
+
+    const familyId = household.family_id as string | null;
+
+    if (familyId) {
+      // The family is the source of truth, but every group keeps a copy so
+      // routes, pickups, and push can read an address without a join. Edit
+      // once, then push the change to each group the family belongs to.
+      const { error: familyError } = await admin
+        .from("families")
+        .update(details)
+        .eq("id", familyId);
+      if (familyError) throw familyError;
+
+      const { error: mirrorError } = await admin
+        .from("group_households")
+        .update(details)
+        .eq("family_id", familyId);
+      if (mirrorError) throw mirrorError;
+    } else {
+      const { error: householdError } = await admin
+        .from("group_households")
+        .update(details)
+        .eq("group_id", groupId)
+        .eq("id", householdId);
+      if (householdError) throw householdError;
+    }
 
     return Response.json({ ok: true });
   } catch (error) {

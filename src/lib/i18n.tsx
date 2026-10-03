@@ -694,6 +694,8 @@ export const hebrew: Record<string, string> = {
   "Could not link this device to your groups.":
     "לא ניתן לקשר את המכשיר לקבוצות שלכם.",
   "Sign in again to continue.": "היכנסו שוב כדי להמשיך.",
+  "Add your family details before creating a group.":
+    "הוסיפו את פרטי המשפחה לפני יצירת קבוצה.",
   "Choose a new six-digit code.": "בחרו קוד חדש בן שש ספרות.",
   "Choose a six-digit code.": "בחרו קוד בן שש ספרות.",
   "That is not your current code.": "זה אינו הקוד הנוכחי שלכם.",
