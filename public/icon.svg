@@ -7,15 +7,16 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" fill="url(#carpool-bg)"/>
-  <g>
-    <rect x="82" y="258" width="348" height="76" rx="30" fill="#fff6e6"/>
-    <path fill="#fff6e6" d="M150 278 L190 184 Q198 170 214 168 L298 168 Q314 170 322 184 L362 278 Z"/>
-    <path fill="#31283d" d="M176 262 L208 196 Q213 188 224 187 L288 187 Q299 188 304 196 L336 262 Z"/>
-    <circle cx="228" cy="226" r="20" fill="#fff6e6"/>
-    <circle cx="284" cy="226" r="20" fill="#fff6e6"/>
-    <circle cx="150" cy="332" r="40" fill="#fff6e6"/>
-    <circle cx="362" cy="332" r="40" fill="#fff6e6"/>
-    <circle cx="150" cy="332" r="30" fill="#31283d"/>
-    <circle cx="362" cy="332" r="30" fill="#31283d"/>
+  <g transform="translate(256 256) scale(1.1) translate(-256 -256)">
+    <rect x="90" y="219" width="332" height="110" rx="28" fill="#fff6e6"/>
+    <path fill="#fff6e6" d="M148 249 L206 155 Q213 147 223 146 L289 146 Q299 147 306 155 L364 249 Z"/>
+    <path fill="#31283d" d="M178 239 L204 177 L250 177 L250 239 Z"/>
+    <path fill="#31283d" d="M262 239 L262 177 L308 177 L334 239 Z"/>
+    <circle cx="221" cy="207" r="20" fill="#fff6e6"/>
+    <circle cx="291" cy="207" r="20" fill="#fff6e6"/>
+    <circle cx="148" cy="329" r="34" fill="#fff6e6"/>
+    <circle cx="364" cy="329" r="34" fill="#fff6e6"/>
+    <circle cx="148" cy="329" r="28" fill="#31283d"/>
+    <circle cx="364" cy="329" r="28" fill="#31283d"/>
   </g>
 </svg>

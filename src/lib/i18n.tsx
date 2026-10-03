@@ -695,6 +695,16 @@ export const hebrew: Record<string, string> = {
     "לא ניתן לקשר את המכשיר לקבוצות שלכם.",
   "Sign in again to continue.": "היכנסו שוב כדי להמשיך.",
   "Personal code": "קוד אישי",
+  "Change the code you sign in with": "שינוי הקוד שאיתו אתם נכנסים",
+  "Manage {{group}}": "ניהול {{group}}",
+  "Change your code": "שינוי הקוד שלכם",
+  "You sign in with {{phone}} and this code.":
+    "אתם נכנסים עם {{phone}} ועם הקוד הזה.",
+  "Your code has changed.": "הקוד שלכם שונה.",
+  "Pick the group to manage. Rides always show every group.":
+    "בחרו את הקבוצה לניהול. הנסיעות תמיד מציגות את כל הקבוצות.",
+  "Your family comes with you. Add people by phone number once the group exists.":
+    "המשפחה שלכם מגיעה אתכם. הוסיפו אנשים לפי מספר טלפון אחרי יצירת הקבוצה.",
   "Use your phone number and your personal code.":
     "השתמשו במספר הטלפון ובקוד האישי שלכם.",
   "Six-digit code": "קוד בן שש ספרות",

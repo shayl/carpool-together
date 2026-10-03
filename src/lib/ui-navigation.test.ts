@@ -9,7 +9,7 @@ test("team task sections restore from URLs, with venue links opening Places", ()
 });
 
 test("settings navigation recognizes category pages and rejects unknown pages", () => {
-  for (const section of ["preferences", "groups", "management", "about", "help"]) assert.equal(settingsSectionFromParams(new URLSearchParams({ settings: section })), section);
+  for (const section of ["preferences", "code", "about", "help"]) assert.equal(settingsSectionFromParams(new URLSearchParams({ settings: section })), section);
   assert.equal(settingsSectionFromParams(new URLSearchParams({ settings: "unknown" })), null);
 });
 

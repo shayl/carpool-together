@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { hashPersonalCode, initialCodeFromPhone } from "@/lib/personal-code";
 import { normalizePhone } from "@/lib/phone";
 import { toSlug } from "@/lib/slug";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -11,7 +11,6 @@ const bootstrapSchema = z.object({
   groupName: z.string().trim().min(2).max(100),
   memberName: z.string().trim().min(1).max(100),
   phone: z.string().min(7).max(30),
-  pin: z.string().min(4).max(12),
 });
 
 function secretsMatch(actual: string, expected: string) {
@@ -24,6 +23,9 @@ function secretsMatch(actual: string, expected: string) {
   );
 }
 
+// The cold-start path for an empty database: there is no organizer to add the
+// first person, so this creates their account and their first group in one
+// step. Everyone after them is added to a roster instead.
 export async function POST(request: Request) {
   try {
     const parsed = bootstrapSchema.safeParse(
@@ -57,28 +59,42 @@ export async function POST(request: Request) {
       );
     }
 
-    const slug = toSlug(parsed.data.groupName);
-    const pinHash = await bcrypt.hash(parsed.data.pin, 12);
-    const { error } = await admin.rpc("bootstrap_first_group", {
-      auth_user_id: authData.user.id,
-      group_name: parsed.data.groupName,
-      group_pin_hash: pinHash,
-      group_slug: slug,
-      member_name: parsed.data.memberName,
-      member_phone: normalizePhone(parsed.data.phone),
-    });
-
-    if (error) {
-      if (error.message.includes("already been set up")) {
-        return Response.json(
-          { error: "The first group has already been set up." },
-          { status: 409 },
-        );
-      }
-      throw error;
+    const { count, error: countError } = await admin
+      .from("groups")
+      .select("id", { count: "exact", head: true });
+    if (countError) throw countError;
+    if (count) {
+      return Response.json(
+        { error: "The first group has already been set up." },
+        { status: 409 },
+      );
     }
 
-    return Response.json({ ok: true });
+    const phone = normalizePhone(parsed.data.phone);
+    const { data: account, error: accountError } = await admin
+      .from("accounts")
+      .insert({
+        phone,
+        display_name: parsed.data.memberName,
+        code_hash: await hashPersonalCode(initialCodeFromPhone(phone)),
+        must_change_code: true,
+      })
+      .select("id")
+      .single();
+    if (accountError) throw accountError;
+
+    const { data: groupId, error } = await admin.rpc(
+      "create_group_for_account",
+      {
+        account_id: account.id,
+        auth_user_id: authData.user.id,
+        group_name: parsed.data.groupName,
+        group_slug: toSlug(parsed.data.groupName),
+      },
+    );
+    if (error) throw error;
+
+    return Response.json({ ok: true, groupId });
   } catch (error) {
     console.error(error);
     return Response.json(

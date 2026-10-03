@@ -1,6 +1,6 @@
 export const teamSections = ["schedule", "people", "places", "balance"] as const;
 export type TeamSection = (typeof teamSections)[number];
-export const settingsSections = ["preferences", "groups", "management", "about", "help"] as const;
+export const settingsSections = ["preferences", "code", "about", "help"] as const;
 export type SettingsSection = (typeof settingsSections)[number];
 
 export function teamSectionFromParams(params: Pick<URLSearchParams, "get">): TeamSection {

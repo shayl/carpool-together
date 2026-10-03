@@ -2242,53 +2242,6 @@ button:disabled {
   text-align: center;
 }
 
-.generated-pin-card {
-  display: grid;
-  gap: 16px;
-  text-align: center;
-}
-
-.generated-pin-card h2,
-.generated-pin-card p {
-  margin: 0;
-}
-
-.generated-pin {
-  display: block;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface-subtle);
-  padding: 16px;
-  color: var(--foreground);
-  font-size: clamp(30px, 9vw, 44px);
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-align: center;
-}
-
-.generated-pin-card .secondary-button {
-  justify-content: center;
-}
-
-.group-pin-settings {
-  display: grid;
-  gap: 14px;
-}
-
-.group-pin-settings h3,
-.group-pin-settings p {
-  margin: 0;
-}
-
-.group-pin-settings .generated-pin {
-  max-width: 360px;
-}
-
-.group-pin-settings .secondary-button,
-.group-pin-settings .text-button {
-  width: fit-content;
-}
-
 .about-version {
   display: block;
   margin-top: 18px;
@@ -3053,6 +3006,16 @@ summary {
 .balance-row strong {
   flex-shrink: 0;
   color: var(--team);
+}
+
+.groups-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.groups-picker h2,
+.groups-picker p {
+  margin: 0;
 }
 
 .settings-task {
