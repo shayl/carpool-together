@@ -1,10 +1,30 @@
 import { addDays, format, startOfWeek } from "date-fns";
 import { z } from "zod";
-import type { AppGroup } from "./app-data";
+import type { AppAccount, AppFamily, AppGroup } from "./app-data";
 import { rideState } from "./schedule-state";
 
 export function previewEnabled(environment: string | undefined) {
   return environment === "development";
+}
+
+export function createPreviewAccount(): AppAccount {
+  return {
+    id: "demo-account",
+    phone: "+12025550102",
+    displayName: "Sam Morgan",
+    familyId: "morgan",
+  };
+}
+
+export function createPreviewFamily(): AppFamily {
+  return {
+    id: "morgan",
+    name: "Morgan",
+    address: "4821 Maple Grove Lane, Bellevue, WA",
+    latitude: null,
+    longitude: null,
+    riders: [{ id: "rowan", name: "Rowan Morgan" }],
+  };
 }
 
 export function createPreviewGroups(now: Date): AppGroup[] {

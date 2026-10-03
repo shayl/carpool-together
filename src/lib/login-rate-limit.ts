@@ -62,3 +62,44 @@ export async function clearFailedLogins(
     .eq("identifier_hash", identifierHashValue);
   if (error) throw error;
 }
+
+// A personal code is only six digits and is the one thing guarding an
+// account, so the phone+IP limit above is not enough on its own: an attacker
+// who rotates IPs gets unlimited attempts. This second counter ignores the
+// address, at the cost of letting someone deliberately lock a phone they know.
+const ACCOUNT_MAX_ATTEMPTS = 10;
+
+export function accountIdentifierHash(phone: string) {
+  const secret = process.env.AUTH_RATE_LIMIT_SECRET;
+  if (!secret) throw new Error("AUTH_RATE_LIMIT_SECRET is required.");
+
+  return createHmac("sha256", secret)
+    .update(`account|${normalizePhone(phone)}`)
+    .digest("hex");
+}
+
+export async function enforceAccountLockout(
+  admin: SupabaseClient,
+  phone: string,
+) {
+  const hash = accountIdentifierHash(phone);
+  const since = new Date(Date.now() - WINDOW_MS).toISOString();
+  const { count, error } = await admin
+    .from("auth_login_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("identifier_hash", hash)
+    .gte("attempted_at", since);
+
+  if (error) throw error;
+  if ((count ?? 0) >= ACCOUNT_MAX_ATTEMPTS) {
+    throw Response.json(
+      {
+        error:
+          "This account is locked after too many attempts. Try again in 15 minutes.",
+      },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
+  return hash;
+}

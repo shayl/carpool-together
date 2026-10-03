@@ -1,8 +1,11 @@
 import { connection } from "next/server";
 import { CarpoolApp } from "@/components/carpool-app";
+import { ChangeCodeForm } from "@/components/auth/change-code-form";
 import { SignInForm } from "@/components/auth/sign-in-form";
-import { loadAppData } from "@/lib/app-data";
+import { accountForUser, syncAccountMemberships } from "@/lib/account";
+import { loadAccountFamily, loadAppData } from "@/lib/app-data";
 import { navigationStateFromSearchParams } from "@/lib/navigation-state";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type HomeProps = {
@@ -31,14 +34,37 @@ export default async function Home({ searchParams }: HomeProps) {
     return <SignInForm />;
   }
 
-  const groups = await loadAppData(userId);
-  if (groups.length === 0) {
+  // An organizer can add this phone to a group at any time; reconciling here
+  // is what makes that group simply appear on the next load.
+  const admin = createAdminClient();
+  await syncAccountMemberships(admin, userId);
+
+  const account = await accountForUser(admin, userId);
+  if (!account) {
     return <SignInForm />;
   }
+
+  // The phone-derived starting code is public knowledge, so nothing behind it
+  // opens until it has been replaced.
+  if (account.must_change_code) {
+    return <ChangeCodeForm phone={account.phone} />;
+  }
+
+  const [groups, family] = await Promise.all([
+    loadAppData(userId),
+    loadAccountFamily(account),
+  ]);
 
   return (
     <CarpoolApp
       initialGroups={groups}
+      account={{
+        id: account.id,
+        phone: account.phone,
+        displayName: account.display_name ?? "",
+        familyId: account.family_id,
+      }}
+      family={family}
       initialNavigation={navigationStateFromSearchParams(urlSearchParams)}
     />
   );

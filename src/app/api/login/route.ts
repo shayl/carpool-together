@@ -1,21 +1,19 @@
 import { z } from "zod";
-import {
-  matchingRosterEntries,
-  membershipsForPhone,
-  type RosterEntry,
-} from "@/lib/group-access";
+import { membershipsForPhone, type RosterEntry } from "@/lib/group-access";
 import {
   clearFailedLogins,
+  enforceAccountLockout,
   enforceLoginRateLimit,
   recordFailedLogin,
 } from "@/lib/login-rate-limit";
+import { verifyPersonalCode } from "@/lib/personal-code";
 import { phoneLookupValues } from "@/lib/phone";
 import { apiError } from "@/lib/server-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const loginSchema = z.object({
   phone: z.string().min(7).max(30),
-  pin: z.string().min(4).max(12),
+  code: z.string().min(4).max(12),
   accessToken: z.string().min(20),
 });
 
@@ -32,12 +30,12 @@ async function handleLogin(request: Request) {
 
   if (!parsed.success) {
     return Response.json(
-      { error: "Enter a valid phone number and group PIN." },
+      { error: "Enter a valid phone number and personal code." },
       { status: 400 },
     );
   }
 
-  const { accessToken, phone, pin } = parsed.data;
+  const { accessToken, phone, code } = parsed.data;
   const admin = createAdminClient();
   const { data: authData, error: authError } =
     await admin.auth.getUser(accessToken);
@@ -47,12 +45,65 @@ async function handleLogin(request: Request) {
   }
 
   const rateLimitHash = await enforceLoginRateLimit(admin, phone, request);
+  const accountHash = await enforceAccountLockout(admin, phone);
+
+  const { data: account, error: accountError } = await admin
+    .from("accounts")
+    .select("id, phone, code_hash, must_change_code, display_name")
+    .in("phone", phoneLookupValues(phone))
+    .maybeSingle();
+
+  if (accountError) {
+    console.error(accountError);
+    return Response.json({ error: "Could not sign in." }, { status: 500 });
+  }
+
+  // One message whether the phone is unknown or the code is wrong, so this
+  // cannot be used to discover which numbers have accounts.
+  if (!account || !(await verifyPersonalCode(code, account.code_hash))) {
+    await Promise.all([
+      recordFailedLogin(admin, rateLimitHash),
+      recordFailedLogin(admin, accountHash),
+    ]);
+    return Response.json(
+      { error: "Phone number or personal code is incorrect." },
+      { status: 401 },
+    );
+  }
+
+  const { error: deviceError } = await admin
+    .from("account_devices")
+    .upsert(
+      { account_id: account.id, user_id: authData.user.id },
+      { onConflict: "account_id,user_id" },
+    );
+
+  if (deviceError) {
+    console.error(deviceError);
+    return Response.json(
+      { error: "Could not link this device to your account." },
+      { status: 500 },
+    );
+  }
+
+  // Claim roster rows an organizer added before this account existed, so the
+  // groups they were added to start following the account.
+  const { error: claimError } = await admin
+    .from("group_access_roster")
+    .update({ account_id: account.id })
+    .is("account_id", null)
+    .in("phone", phoneLookupValues(phone));
+
+  if (claimError) {
+    console.error(claimError);
+    return Response.json({ error: "Could not sign in." }, { status: 500 });
+  }
+
   const { data: rosterEntries, error: rosterError } = await admin
     .from("group_access_roster")
     .select("id, group_id, display_name, role")
-    .in("phone", phoneLookupValues(phone))
-    .eq("active", true)
-    .limit(20);
+    .eq("account_id", account.id)
+    .eq("active", true);
 
   if (rosterError) {
     console.error(rosterError);
@@ -63,64 +114,26 @@ async function handleLogin(request: Request) {
   }
 
   const entries = (rosterEntries ?? []) as RosterEntry[];
-  const groupIds = [...new Set(entries.map((entry) => entry.group_id))];
-  const { data: groups, error: groupsError } = groupIds.length
-    ? await admin.from("groups").select("id, name, pin_hash").in("id", groupIds)
-    : { data: [], error: null };
 
-  if (groupsError) {
-    console.error(groupsError);
-    return Response.json(
-      { error: "Could not check group access." },
-      { status: 500 },
-    );
-  }
+  if (entries.length) {
+    const { error: membershipError } = await admin
+      .from("group_memberships")
+      .upsert(membershipsForPhone(entries, authData.user.id), {
+        onConflict: "group_id,user_id",
+      });
 
-  const pinHashes = new Map<string, string | null>(
-    (groups ?? []).map((group) => [
-      group.id as string,
-      group.pin_hash as string | null,
-    ]),
-  );
-  const matches = await matchingRosterEntries(entries, pinHashes, pin);
-
-  if (matches.length === 0) {
-    await recordFailedLogin(admin, rateLimitHash);
-    return Response.json(
-      { error: "Phone number or group PIN is incorrect." },
-      { status: 401 },
-    );
-  }
-
-  if (matches.length > 1) {
-    return Response.json(
-      {
-        error:
-          "This phone and PIN match more than one group. Ask an organizer to use a different group PIN.",
-      },
-      { status: 409 },
-    );
-  }
-
-  const match = matches[0];
-  const { error: membershipError } = await admin
-    .from("group_memberships")
-    .upsert(
-      membershipsForPhone(entries, authData.user.id),
-      { onConflict: "group_id,user_id" },
-    );
-
-  if (membershipError) {
-    console.error(membershipError);
-    return Response.json(
-      { error: "Could not link this device to the group." },
-      { status: 500 },
-    );
+    if (membershipError) {
+      console.error(membershipError);
+      return Response.json(
+        { error: "Could not link this device to your groups." },
+        { status: 500 },
+      );
+    }
   }
 
   const { error: profileError } = await admin
     .from("profiles")
-    .update({ display_name: match.display_name })
+    .update({ display_name: account.display_name ?? entries[0]?.display_name })
     .eq("user_id", authData.user.id);
 
   if (profileError) {
@@ -131,11 +144,16 @@ async function handleLogin(request: Request) {
     );
   }
 
-  await clearFailedLogins(admin, rateLimitHash);
+  await Promise.all([
+    clearFailedLogins(admin, rateLimitHash),
+    clearFailedLogins(admin, accountHash),
+  ]);
+
   return Response.json({
     ok: true,
-    groupId: match.group_id,
-    linkedGroupCount: entries.length,
+    accountId: account.id,
+    mustChangeCode: account.must_change_code,
+    groupCount: entries.length,
   });
 }
 

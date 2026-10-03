@@ -4,7 +4,10 @@ import { useRef, useState } from "react";
 import { CarpoolApp } from "@/components/carpool-app";
 import type { AppGroup } from "@/lib/app-data";
 import { AppTransportContext } from "@/lib/app-transport";
-import { applyPreviewRequest, createPreviewGroups } from "@/lib/preview-data";
+import { applyPreviewRequest, createPreviewGroups,
+  createPreviewAccount,
+  createPreviewFamily,
+} from "@/lib/preview-data";
 import type { NavigationState } from "@/lib/navigation-state";
 import { useI18n } from "@/lib/i18n";
 
@@ -42,6 +45,6 @@ export function PreviewApp({ initialGroups, initialNavigation }: {
       <summary>{t("Local demo · sample data only")}</summary>
       <p>{t("Ride claims and family plans work in memory. Reload to reset. No database changes.")}</p>
     </details>
-    <CarpoolApp initialGroups={groups} initialNavigation={initialNavigation} />
+    <CarpoolApp initialGroups={groups} account={createPreviewAccount()} family={createPreviewFamily()} initialNavigation={initialNavigation} />
   </AppTransportContext.Provider>;
 }

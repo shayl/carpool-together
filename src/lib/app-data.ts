@@ -1,3 +1,4 @@
+import type { AccountRecord } from "@/lib/account";
 import type { GroupRole } from "@/lib/server-auth";
 import { loadGroupSchedules } from "@/lib/group-schedule-data";
 import type { GroupSchedule } from "@/lib/schedule-types";
@@ -11,6 +12,22 @@ export type AppRosterEntry = {
   photoUrl?: string;
   role: GroupRole;
   active: boolean;
+};
+
+export type AppAccount = {
+  id: string;
+  phone: string;
+  displayName: string;
+  familyId: string | null;
+};
+
+export type AppFamily = {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  riders: Array<{ id: string; name: string }>;
 };
 
 export type AppGroup = {
@@ -130,4 +147,42 @@ export async function loadAppData(userId: string) {
       },
     ];
   });
+}
+
+// The account's own family: one address, one set of riders, shared by every
+// group. Groups keep a copy of the address, but this is what people edit.
+export async function loadAccountFamily(
+  account: AccountRecord,
+): Promise<AppFamily | null> {
+  if (!account.family_id) return null;
+  const admin = createAdminClient();
+  const [{ data: family, error }, { data: riders, error: ridersError }] =
+    await Promise.all([
+      admin
+        .from("families")
+        .select("id, name, address, latitude, longitude")
+        .eq("id", account.family_id)
+        .maybeSingle(),
+      admin
+        .from("family_riders")
+        .select("id, display_name")
+        .eq("family_id", account.family_id)
+        .order("display_name"),
+    ]);
+
+  if (error) throw error;
+  if (ridersError) throw ridersError;
+  if (!family) return null;
+
+  return {
+    id: family.id,
+    name: family.name,
+    address: family.address,
+    latitude: family.latitude,
+    longitude: family.longitude,
+    riders: (riders ?? []).map((rider) => ({
+      id: rider.id,
+      name: rider.display_name,
+    })),
+  };
 }

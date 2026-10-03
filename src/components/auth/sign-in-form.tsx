@@ -4,24 +4,16 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppVersion } from "@/components/app-version";
-import { GeneratedGroupPin } from "@/components/generated-group-pin";
 import { LanguagePicker, useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/browser";
 
 export function SignInForm() {
   const router = useRouter();
   const { t } = useI18n();
-  const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
-  const [groupName, setGroupName] = useState("");
-  const [memberName, setMemberName] = useState("");
   const [phone, setPhone] = useState("");
-  const [pin, setPin] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [createdGroup, setCreatedGroup] = useState<{
-    name: string;
-    pin: string;
-  } | null>(null);
 
   async function anonymousAccessToken() {
     const supabase = createClient();
@@ -51,71 +43,24 @@ export function SignInForm() {
 
     try {
       const accessToken = await anonymousAccessToken();
-      const registering = mode === "register";
-      const response = await fetch(registering ? "/api/register" : "/api/login", {
+      const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone,
-          accessToken,
-          ...(registering ? { groupName, memberName } : { pin }),
-        }),
+        body: JSON.stringify({ phone, code, accessToken }),
       });
-      const result = (await response.json()) as {
-        error?: string;
-        pin?: string;
-      };
+      const result = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        throw new Error(
-          result.error ??
-            (registering
-              ? t("Could not create the group.")
-              : t("Sign-in failed.")),
-        );
+        throw new Error(result.error ?? t("Sign-in failed."));
       }
 
-      if (registering && result.pin) {
-        setCreatedGroup({ name: groupName, pin: result.pin });
-        setBusy(false);
-      } else {
-        router.refresh();
-      }
+      router.refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error
-          ? caught.message
-          : mode === "register"
-            ? t("Could not create the group.")
-            : t("Sign-in failed."),
+        caught instanceof Error ? caught.message : t("Sign-in failed."),
       );
       setBusy(false);
     }
-  }
-
-  function changeMode(nextMode: "sign-in" | "register") {
-    setMode(nextMode);
-    setError("");
-    setPin("");
-    setCreatedGroup(null);
-  }
-
-  const registering = mode === "register";
-
-  if (createdGroup) {
-    return (
-      <main className="auth-page">
-        <section className="auth-card">
-          <LanguagePicker />
-          <GeneratedGroupPin
-            groupName={createdGroup.name}
-            pin={createdGroup.pin}
-            onContinue={() => router.refresh()}
-          />
-          <AppVersion />
-        </section>
-      </main>
-    );
   }
 
   return (
@@ -127,50 +72,13 @@ export function SignInForm() {
         </div>
         <div>
           <p className="auth-eyebrow">Carpool Together</p>
-          <h1 id="sign-in-heading">
-            {registering
-              ? t("Create your group")
-              : t("Sign in to your groups")}
-          </h1>
+          <h1 id="sign-in-heading">{t("Sign in")}</h1>
           <p className="auth-description">
-            {registering
-              ? t(
-                  "Start a private group and invite members with their phone number.",
-                )
-              : t(
-                  "Use the phone number on your group roster and the shared group PIN.",
-                )}
+            {t("Use your phone number and your personal code.")}
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          {registering && (
-            <>
-              <label htmlFor="group-name">{t("Group name")}</label>
-              <div className="auth-input-wrap">
-                <input
-                  id="group-name"
-                  required
-                  maxLength={100}
-                  value={groupName}
-                  onChange={(event) => setGroupName(event.target.value)}
-                  placeholder={t("Neighborhood carpool")}
-                />
-              </div>
-              <label htmlFor="member-name">{t("Your name")}</label>
-              <div className="auth-input-wrap">
-                <input
-                  id="member-name"
-                  required
-                  maxLength={100}
-                  autoComplete="name"
-                  value={memberName}
-                  onChange={(event) => setMemberName(event.target.value)}
-                  placeholder={t("Alex Morgan")}
-                />
-              </div>
-            </>
-          )}
           <label htmlFor="phone">{t("Phone number")}</label>
           <div className="auth-input-wrap">
             <input
@@ -186,37 +94,32 @@ export function SignInForm() {
               placeholder="(555) 123-4567"
             />
           </div>
-          <p id="phone-hint" className="auth-footnote">
+          <p className="auth-footnote">
             {t("For US numbers, enter all 10 digits. No +1 needed.")}
           </p>
-          {!registering && (
-            <>
-              <label htmlFor="pin">{t("Group PIN")}</label>
-              <div className="auth-input-wrap">
-                <input
-                  id="pin"
-                  name="pin"
-                  type="password"
-                  autoComplete="current-password"
-                  inputMode="numeric"
-                  minLength={4}
-                  maxLength={12}
-                  required
-                  value={pin}
-                  onChange={(event) => setPin(event.target.value)}
-                  placeholder={t("Shared group PIN")}
-                />
-              </div>
-            </>
-          )}
+          <label htmlFor="code">{t("Personal code")}</label>
+          <div className="auth-input-wrap">
+            <input
+              id="code"
+              name="code"
+              type="password"
+              autoComplete="current-password"
+              inputMode="numeric"
+              minLength={4}
+              maxLength={12}
+              required
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder={t("Six-digit code")}
+            />
+          </div>
+          <p className="auth-footnote">
+            {t(
+              "Signing in for the first time? Your code is the last six digits of this phone number.",
+            )}
+          </p>
           <button className="primary-button" type="submit" disabled={busy}>
-            {busy
-              ? registering
-                ? t("Creating group…")
-                : t("Signing in…")
-              : registering
-                ? t("Register and create group")
-                : t("Open my groups")}
+            {busy ? t("Signing in…") : t("Open my rides")}
           </button>
         </form>
 
@@ -225,26 +128,8 @@ export function SignInForm() {
             {error}
           </p>
         )}
-        <div className="auth-switch">
-          <span>
-            {registering
-              ? t("Already belong to a group?")
-              : t("Starting a new carpool group?")}
-          </span>
-          <button
-            type="button"
-            onClick={() => changeMode(registering ? "sign-in" : "register")}
-            disabled={busy}
-          >
-            {registering ? t("Sign in") : t("Register and create a group")}
-          </button>
-        </div>
         <p className="auth-footnote">
-          {registering
-            ? t(
-                "By creating a group, you agree to handle member information responsibly. ",
-              )
-            : t("Ask a group organizer if you do not know the PIN. ")}
+          {t("An organizer adds your phone number to their group. ")}
           <Link href="/privacy">{t("Privacy notice")}</Link>
         </p>
         <AppVersion />

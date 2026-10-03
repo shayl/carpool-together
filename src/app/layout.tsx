@@ -26,7 +26,10 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+    icon: [
+      { url: "/icon-small.svg", type: "image/svg+xml", sizes: "16x16" },
+      { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+    ],
   },
 };
 

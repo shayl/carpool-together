@@ -4,15 +4,12 @@ import {
   ArrowLeft,
   BookOpen,
   Car,
-  Check,
   ChevronDown,
-  Copy,
   Heart,
   ImagePlus,
   Info,
   LogOut,
   Settings,
-  Share2,
   ShieldCheck,
   Upload,
   Users,
@@ -20,16 +17,16 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppVersion } from "@/components/app-version";
-import { GeneratedGroupPin } from "@/components/generated-group-pin";
-import { GroupPinSettings } from "@/components/group-pin-settings";
 import { InstallAppCard } from "@/components/install-app-card";
 import { PushReminderSettings } from "@/components/push-reminder-settings";
 import { MemberAvatar } from "@/components/member-avatar";
+import { PersonalCodeSettings } from "@/components/personal-code-settings";
 import { ThemePicker } from "@/components/theme-picker";
 import { ScheduleViews } from "@/components/schedule-views";
 import { Sheet } from "@/components/sheet";
-import { PullToRefresh, RefreshFeedback, ScheduleRefreshButton } from "@/components/pull-to-refresh";
-import type { AppGroup } from "@/lib/app-data";
+import { PullToRefresh, RefreshFeedback } from "@/components/pull-to-refresh";
+import { mergeGroupSchedules } from "@/lib/all-groups-schedule";
+import type { AppAccount, AppFamily, AppGroup } from "@/lib/app-data";
 import { LanguagePicker, useI18n } from "@/lib/i18n";
 import { AppTransportContext, useAppTransport, type AppTransport } from "@/lib/app-transport";
 import { availableGroupId, settingsSectionFromParams, type SettingsSection } from "@/lib/ui-navigation";
@@ -44,15 +41,19 @@ type SettingsPage = SettingsSection | null;
 const destinations = [
   { id: "rides", label: "Rides", icon: Car },
   { id: "family", label: "My family", icon: Heart },
-  { id: "team", label: "Team", icon: Users },
+  { id: "groups", label: "Groups", icon: Users },
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function CarpoolApp({
   initialGroups,
+  account,
+  family,
   initialNavigation,
 }: {
   initialGroups: AppGroup[];
+  account: AppAccount;
+  family: AppFamily | null;
   initialNavigation: NavigationState;
 }) {
   const router = useRouter();
@@ -85,12 +86,6 @@ export function CarpoolApp({
   >("member");
   const [csv, setCsv] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
-  const [existingGroupPhone, setExistingGroupPhone] = useState("");
-  const [existingGroupPin, setExistingGroupPin] = useState("");
-  const [createdGroup, setCreatedGroup] = useState<{
-    name: string;
-    pin: string;
-  } | null>(null);
   const [showDeleteGroup, setShowDeleteGroup] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [error, setError] = useState("");
@@ -142,7 +137,8 @@ export function CarpoolApp({
       const { createClient } = await import("@/lib/supabase/browser");
       if (disposed) return;
       const client = createClient();
-      const channel = client.channel(`group-updates-${group.id}`);
+      const groupIds = groups.map((item) => item.id);
+      const channel = client.channel(`group-updates-${groupIds.join("-")}`);
       for (const table of [
         "group_households",
         "group_access_roster",
@@ -161,7 +157,7 @@ export function CarpoolApp({
             event: "*",
             schema: "public",
             table,
-            filter: `group_id=eq.${group.id}`,
+            filter: `group_id=in.(${groupIds.join(",")})`,
           },
           refresh,
         );
@@ -178,7 +174,7 @@ export function CarpoolApp({
       clearTimeout(refreshTimer);
       unsubscribe?.();
     };
-  }, [group.id, router, transport.preview, t]);
+  }, [groups, router, transport.preview, t]);
 
   function navigate(nextDestination: Destination, history: "push" | "replace" = "push") {
     setDestination(nextDestination);
@@ -343,7 +339,6 @@ export function CarpoolApp({
       const result = (await response.json()) as {
         error?: string;
         groupId?: string;
-        pin?: string;
       };
       if (!response.ok) {
         throw new Error(
@@ -351,12 +346,8 @@ export function CarpoolApp({
         );
       }
 
-      if (!result.pin) {
-        throw new Error(t("Could not generate a group PIN."));
-      }
-      setCreatedGroup({ name: newGroupName, pin: result.pin });
       setNewGroupName("");
-      if (result.groupId) switchGroup(result.groupId, "settings");
+      if (result.groupId) switchGroup(result.groupId, "groups");
       router.refresh();
     } catch (caught) {
       setError(
@@ -369,52 +360,6 @@ export function CarpoolApp({
     }
   }
 
-  async function addExistingGroup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      const { data, error: sessionError } =
-        await (await import("@/lib/supabase/browser")).createClient().auth.getSession();
-      if (sessionError) throw sessionError;
-      const accessToken = data.session?.access_token;
-      if (!accessToken) throw new Error(t("Sign-in required."));
-
-      const response = await transport.request("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: existingGroupPhone,
-          pin: existingGroupPin,
-          accessToken,
-        }),
-      });
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-        groupId?: string;
-      } | null;
-      if (!response.ok) {
-        throw new Error(result?.error ?? t("Could not add the group."));
-      }
-      if (!result?.groupId) {
-        throw new Error(t("Could not add the group."));
-      }
-
-      setExistingGroupPhone("");
-      setExistingGroupPin("");
-      switchGroup(result.groupId, "rides");
-      setSettingsPage(null);
-      router.refresh();
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? t(caught.message)
-          : t("Could not add the group."),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function deleteGroup() {
     if (deleteConfirmation !== group.name) return;
@@ -553,32 +498,6 @@ export function CarpoolApp({
       <a className="skip-link" href="#main-content">
         {t("Skip to content")}
       </a>
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div className="brand-lockup">
-            <MemberAvatar
-              name={group.shortName}
-              photoUrl={group.iconUrl}
-              size={44}
-              className="team-logo"
-            />
-            <div className="brand-copy">
-              {groups.length === 1 ? <p>{group.name}</p> : (
-                <label className="group-switcher group-identity-switcher">
-                  <span className="sr-only">{t("Active group")}</span>
-                  <select value={group.id} onChange={(event) => switchGroup(event.target.value, "rides")}>
-                    {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                  <ChevronDown size={16} aria-hidden="true" />
-                </label>
-              )}
-              <span>{group.currentMemberName}</span>
-            </div>
-            <ScheduleRefreshButton />
-          </div>
-        </div>
-      </header>
-
       <nav className="app-navigation" aria-label={t("Main navigation")}>
         {destinations.map(({ id, label, icon: Icon }) => (
           <button
@@ -608,16 +527,89 @@ export function CarpoolApp({
             )}
           </div>
         )}
+        {destination === "groups" && (
+          <>
+            {groups.length > 1 && (
+              <section className="surface-card groups-picker">
+                <h2>{t("Your groups")}</h2>
+                <p className="text-muted">
+                  {t("Pick the group to manage. Rides always show every group.")}
+                </p>
+                <GroupSettings
+                  groups={groups}
+                  activeGroupId={group.id}
+                  onGroup={(groupId) => switchGroup(groupId, "groups")}
+                />
+              </section>
+            )}
+            <details className="settings-task">
+              <summary>{t("Create another group")}</summary>
+              <section className="surface-card">
+                <fieldset className="preview-fieldset" disabled={transport.preview}>
+                  <form className="auth-form" onSubmit={createGroup}>
+                    <label htmlFor="new-group-name">{t("Group name")}</label>
+                    <div className="auth-input-wrap">
+                      <input
+                        id="new-group-name"
+                        required
+                        maxLength={100}
+                        value={newGroupName}
+                        onChange={(event) => setNewGroupName(event.target.value)}
+                        placeholder={t("Neighborhood carpool")}
+                      />
+                    </div>
+                    <p className="auth-footnote">
+                      {t("Your family comes with you. Add people by phone number once the group exists.")}
+                    </p>
+                    <button className="primary-button" disabled={loading}>
+                      {loading ? t("Creating…") : t("Create group")}
+                    </button>
+                  </form>
+                </fieldset>
+                {error && <p className="auth-error">{error}</p>}
+              </section>
+            </details>
+            {group.canManageRoster && (
+              <details className="settings-task">
+                <summary>{t("Manage {{group}}", { group: group.name })}</summary>
+                <GroupManagement
+                  group={group}
+                  loading={loading}
+                  showDeleteGroup={showDeleteGroup}
+                  deleteConfirmation={deleteConfirmation}
+                  onShowDelete={() => {
+                    setShowDeleteGroup(true);
+                    setError("");
+                  }}
+                  onDeleteConfirmation={setDeleteConfirmation}
+                  onCancelDelete={() => {
+                    setShowDeleteGroup(false);
+                    setDeleteConfirmation("");
+                    setError("");
+                  }}
+                  onDelete={deleteGroup}
+                  uploadingImage={uploadingImage}
+                  onChangeImage={changeImage}
+                  onRemoveImage={removeImage}
+                />
+              </details>
+            )}
+          </>
+        )}
         {(destination === "rides" ||
           destination === "family" ||
-          destination === "team") && (
+          destination === "groups") && (
           <ScheduleViews
-            key={`${group.id}-${destination}`}
+            key={destination === "rides" ? "rides" : `${group.id}-${destination}`}
             groupId={group.id}
             groupName={group.name}
             canManage={group.canManageRoster}
             view={destination}
-            schedule={group.schedule}
+            schedule={
+              destination === "rides" ? mergeGroupSchedules(groups) : group.schedule
+            }
+            groups={groups}
+            family={family}
             roster={group.roster}
             currentRosterEntryId={group.currentRosterEntryId}
             uploadingImage={uploadingImage}
@@ -647,7 +639,7 @@ export function CarpoolApp({
           />
         )}
 
-        {destination === "team" && showAddMembers && (
+        {destination === "groups" && showAddMembers && (
           <Sheet title={t("Add people to the group")} busy={loading} onClose={() => setShowAddMembers(false)}>
             {group.canManageRoster && (
               <>
@@ -779,40 +771,10 @@ export function CarpoolApp({
             onSection={openSettings}
             onBack={() => openSettings(null)}
             onSignOut={signOut}
+            account={account}
             signingOut={signingOut}
-            onGroup={(groupId) => switchGroup(groupId, "settings")}
-            activeGroupId={group.id}
-            group={group}
-            groups={groups}
-            loading={loading}
             error={error}
-            newGroupName={newGroupName}
-            createdGroup={createdGroup}
-            showDeleteGroup={showDeleteGroup}
-            deleteConfirmation={deleteConfirmation}
             onHelp={() => openSettings("help")}
-            onCreateGroup={createGroup}
-            onGroupName={setNewGroupName}
-            existingGroupPhone={existingGroupPhone}
-            existingGroupPin={existingGroupPin}
-            onExistingGroupPhone={setExistingGroupPhone}
-            onExistingGroupPin={setExistingGroupPin}
-            onAddExistingGroup={addExistingGroup}
-            onCreatedGroupDone={() => setCreatedGroup(null)}
-            onShowDelete={() => {
-              setShowDeleteGroup(true);
-              setError("");
-            }}
-            onDeleteConfirmation={setDeleteConfirmation}
-            onCancelDelete={() => {
-              setShowDeleteGroup(false);
-              setDeleteConfirmation("");
-              setError("");
-            }}
-            onDelete={deleteGroup}
-            uploadingImage={uploadingImage}
-            onChangeImage={changeImage}
-            onRemoveImage={removeImage}
           />
         )}
         <footer>
@@ -958,37 +920,14 @@ function GroupSettings({
 }
 
 type SettingsHomeProps = {
+  account: AppAccount;
   section: SettingsPage;
   onSection: (page: SettingsPage) => void;
   onBack: () => void;
   onSignOut: () => void;
   signingOut: boolean;
-  activeGroupId: string;
-  onGroup: (id: string) => void;
-  group: AppGroup;
-  groups: AppGroup[];
-  loading: boolean;
   error: string;
-  newGroupName: string;
-  createdGroup: { name: string; pin: string } | null;
-  showDeleteGroup: boolean;
-  deleteConfirmation: string;
   onHelp: () => void;
-  onCreateGroup: (event: FormEvent<HTMLFormElement>) => void;
-  onGroupName: (value: string) => void;
-  existingGroupPhone: string;
-  existingGroupPin: string;
-  onExistingGroupPhone: (value: string) => void;
-  onExistingGroupPin: (value: string) => void;
-  onAddExistingGroup: (event: FormEvent<HTMLFormElement>) => void;
-  onCreatedGroupDone: () => void;
-  onShowDelete: () => void;
-  onDeleteConfirmation: (value: string) => void;
-  onCancelDelete: () => void;
-  onDelete: () => void;
-  uploadingImage: string;
-  onChangeImage: (endpoint: string, image: File, key: string) => Promise<void>;
-  onRemoveImage: (endpoint: string, key: string) => Promise<void>;
 };
 
 function SettingsHome(props: SettingsHomeProps) {
@@ -998,8 +937,7 @@ function SettingsHome(props: SettingsHomeProps) {
     <div className="screen-heading"><h1>{t("Settings")}</h1><p>{t("Make yourself at home.")}</p></div>
     <section className="settings-link-card">
       <button type="button" onClick={() => props.onSection("preferences")}><Settings size={22} /><span><strong>{t("Preferences")}</strong><small>{t("Language, theme, notifications & install")}</small></span><ChevronDown size={18} /></button>
-      <button type="button" onClick={() => props.onSection("groups")}><Users size={22} /><span><strong>{t("Groups")}</strong><small>{t("Switch, join or create a group")}</small></span><ChevronDown size={18} /></button>
-      {(props.group.canManageRoster || props.group.role === "owner") && <button type="button" onClick={() => props.onSection("management")}><ShieldCheck size={22} /><span><strong>{t("Group management")}</strong><small>{t("Group appearance, invitations & access")}</small></span><ChevronDown size={18} /></button>}
+      <button type="button" onClick={() => props.onSection("code")}><ShieldCheck size={22} /><span><strong>{t("Personal code")}</strong><small>{t("Change the code you sign in with")}</small></span><ChevronDown size={18} /></button>
       <button type="button" onClick={props.onHelp}><BookOpen size={22} /><span><strong>{t("Help & privacy")}</strong><small>{t("Quick answers and important information")}</small></span><ChevronDown size={18} /></button>
     </section>
     <button className="text-button settings-signout" type="button" disabled={props.signingOut || transport.preview} onClick={props.onSignOut}><LogOut size={18} />{t("Sign out")}</button>
@@ -1009,8 +947,8 @@ function SettingsHome(props: SettingsHomeProps) {
     <>
       <button className="text-button back-button" type="button" onClick={props.onBack}><ArrowLeft size={18} />{t("Settings")}</button>
       <div className="screen-heading">
-        <h1>{t(props.section === "preferences" ? "Preferences" : props.section === "groups" ? "Groups" : "Group management")}</h1>
-        <p>{props.group.name}</p>
+        <h1>{t(props.section === "preferences" ? "Preferences" : "Personal code")}</h1>
+        <p>{props.account.displayName}</p>
       </div>
       {props.section === "preferences" && <>
       <section className="surface-card"><h3>{t("Language")}</h3><LanguagePicker /></section>
@@ -1025,13 +963,54 @@ function SettingsHome(props: SettingsHomeProps) {
       <h2 className="settings-section-title">{t("App and notifications")}</h2>
       {transport.preview ? <section className="surface-card"><h3>{t("Install and notifications")}</h3><p className="text-muted">{t("Notifications and installation are available in the live app, not this local demo.")}</p></section> : <><InstallAppCard /><PushReminderSettings /></>}
       </>}
-      {props.section === "management" && props.group.canManageRoster && (
+      {props.section === "code" && (
+        <PersonalCodeSettings phone={props.account.phone} />
+      )}
+      {props.error && <p className="auth-error">{props.error}</p>}
+    </>
+  );
+}
+
+// Group-level management lives in the Groups tab, next to the group it acts
+// on. Settings is account-level only.
+type GroupManagementProps = {
+  group: AppGroup;
+  loading: boolean;
+  showDeleteGroup: boolean;
+  deleteConfirmation: string;
+  onShowDelete: () => void;
+  onDeleteConfirmation: (value: string) => void;
+  onCancelDelete: () => void;
+  onDelete: () => void;
+  uploadingImage: string;
+  onChangeImage: (endpoint: string, image: File, key: string) => Promise<void>;
+  onRemoveImage: (endpoint: string, key: string) => Promise<void>;
+};
+
+function GroupManagement({
+  group,
+  loading,
+  showDeleteGroup,
+  deleteConfirmation,
+  onShowDelete,
+  onDeleteConfirmation,
+  onCancelDelete,
+  onDelete,
+  uploadingImage,
+  onChangeImage,
+  onRemoveImage,
+}: GroupManagementProps) {
+  const { t } = useI18n();
+  const transport = useAppTransport();
+  return (
+    <>
+      {group.canManageRoster && (
         <>
           <h2 className="settings-section-title">{t("Group appearance")}</h2>
           <section className="surface-card group-appearance-card">
             <MemberAvatar
-              name={props.group.shortName}
-              photoUrl={props.group.iconUrl}
+              name={group.shortName}
+              photoUrl={group.iconUrl}
               size={72}
               className="group-icon-preview"
             />
@@ -1043,21 +1022,21 @@ function SettingsHome(props: SettingsHomeProps) {
               <span className="image-actions">
                 <label className="secondary-button image-upload-button">
                   <ImagePlus size={17} aria-hidden="true" />
-                  {props.uploadingImage === "group-icon"
+                  {uploadingImage === "group-icon"
                     ? t("Uploading…")
-                    : props.group.iconUrl
+                    : group.iconUrl
                       ? t("Change icon")
                       : t("Add icon")}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    disabled={transport.preview || Boolean(props.uploadingImage)}
+                    disabled={transport.preview || Boolean(uploadingImage)}
                     onChange={(event) => {
                       const image = event.target.files?.[0];
                       event.target.value = "";
                       if (image) {
-                        void props.onChangeImage(
-                          `/api/groups/${props.group.id}/icon`,
+                        void onChangeImage(
+                          `/api/groups/${group.id}/icon`,
                           image,
                           "group-icon",
                         );
@@ -1065,14 +1044,14 @@ function SettingsHome(props: SettingsHomeProps) {
                     }}
                   />
                 </label>
-                {props.group.iconUrl && (
+                {group.iconUrl && (
                   <button
                     className="text-button"
                     type="button"
-                    disabled={transport.preview || Boolean(props.uploadingImage)}
+                    disabled={transport.preview || Boolean(uploadingImage)}
                     onClick={() =>
-                      void props.onRemoveImage(
-                        `/api/groups/${props.group.id}/icon`,
+                      void onRemoveImage(
+                        `/api/groups/${group.id}/icon`,
                         "group-icon",
                       )
                     }
@@ -1085,105 +1064,7 @@ function SettingsHome(props: SettingsHomeProps) {
           </section>
         </>
       )}
-      {props.section === "management" && props.group.role === "owner" && !transport.preview && (
-        <GroupInvitation
-          groupId={props.group.id}
-          groupName={props.group.name}
-        />
-      )}
-      {props.section === "groups" && <>
-      <GroupSettings groups={props.groups} activeGroupId={props.activeGroupId} onGroup={props.onGroup} />
-      <details className="settings-task">
-      <summary>{t("Add an existing group")}</summary>
-      <h2 className="settings-section-title">{t("Add an existing group")}</h2>
-      <section className="surface-card">
-        <fieldset className="preview-fieldset" disabled={transport.preview}>
-        <form className="auth-form" onSubmit={props.onAddExistingGroup}>
-          <p className="text-muted">
-            {t(
-              "Verify another group with its phone number and PIN. Your verified groups will appear in the selector.",
-            )}
-          </p>
-          <label htmlFor="existing-group-phone">{t("Phone number")}</label>
-          <div className="auth-input-wrap">
-            <input
-              id="existing-group-phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              required
-              maxLength={30}
-              value={props.existingGroupPhone}
-              onChange={(event) =>
-                props.onExistingGroupPhone(event.target.value)
-              }
-            />
-          </div>
-          <label htmlFor="existing-group-pin">{t("Group PIN")}</label>
-          <div className="auth-input-wrap">
-            <input
-              id="existing-group-pin"
-              type="password"
-              inputMode="numeric"
-              autoComplete="current-password"
-              required
-              minLength={4}
-              maxLength={12}
-              value={props.existingGroupPin}
-              onChange={(event) => props.onExistingGroupPin(event.target.value)}
-            />
-          </div>
-          <button className="primary-button" disabled={props.loading}>
-            {props.loading ? t("Adding…") : t("Add group")}
-          </button>
-        </form>
-        </fieldset>
-      </section>
-      </details>
-      <details className="settings-task" open={props.createdGroup ? true : undefined}>
-      <summary>{t("Create another group")}</summary>
-      <h2 className="settings-section-title">{t("Create another group")}</h2>
-      <section className="surface-card">
-        <fieldset className="preview-fieldset" disabled={transport.preview}>
-        {props.createdGroup ? (
-          <GeneratedGroupPin
-            groupName={props.createdGroup.name}
-            pin={props.createdGroup.pin}
-            onContinue={props.onCreatedGroupDone}
-          />
-        ) : (
-          <form className="auth-form" onSubmit={props.onCreateGroup}>
-            <label htmlFor="new-group-name">{t("Group name")}</label>
-            <div className="auth-input-wrap">
-              <input
-                id="new-group-name"
-                required
-                maxLength={100}
-                value={props.newGroupName}
-                onChange={(event) => props.onGroupName(event.target.value)}
-                placeholder={t("Neighborhood carpool")}
-              />
-            </div>
-            <p className="auth-footnote">
-              {t("A secure 6-digit group PIN will be generated automatically.")}
-            </p>
-            <button className="primary-button" disabled={props.loading}>
-              {props.loading ? t("Creating…") : t("Create group")}
-            </button>
-          </form>
-        )}
-        </fieldset>
-      </section>
-      </details>
-      </>}
-      {props.section === "management" && props.group.role === "owner" && !transport.preview && (
-        <>
-          <h2 className="settings-section-title">{t("Access")}</h2>
-          <GroupPinSettings groupId={props.group.id} />
-        </>
-      )}
-
-      {props.section === "management" && props.group.role === "owner" && !transport.preview && (
+      {group.role === "owner" && !transport.preview && (
         <>
           <h2 className="settings-section-title">{t("Danger zone")}</h2>
           <section className="surface-card danger-card">
@@ -1196,25 +1077,25 @@ function SettingsHome(props: SettingsHomeProps) {
                 {transport.preview && <p className="preview-note">{t("Demo: organizer, address, and account saves are disabled. Try ride claims and family plans.")}</p>}
               </p>
             </div>
-            {!props.showDeleteGroup ? (
+            {!showDeleteGroup ? (
               <button
                 className="danger-button"
                 type="button"
-                onClick={props.onShowDelete}
+                onClick={onShowDelete}
               >
                 {t("Delete group")}
               </button>
             ) : (
               <div className="delete-group-confirmation">
                 <label htmlFor="delete-group-confirmation">
-                  {t("Type {{name}} to confirm.", { name: props.group.name })}
+                  {t("Type {{name}} to confirm.", { name: group.name })}
                 </label>
                 <div className="auth-input-wrap">
                   <input
                     id="delete-group-confirmation"
-                    value={props.deleteConfirmation}
+                    value={deleteConfirmation}
                     onChange={(event) =>
-                      props.onDeleteConfirmation(event.target.value)
+                      onDeleteConfirmation(event.target.value)
                     }
                   />
                 </div>
@@ -1222,7 +1103,7 @@ function SettingsHome(props: SettingsHomeProps) {
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={props.onCancelDelete}
+                    onClick={onCancelDelete}
                   >
                     {t("Cancel")}
                   </button>
@@ -1230,12 +1111,12 @@ function SettingsHome(props: SettingsHomeProps) {
                     className="danger-button"
                     type="button"
                     disabled={
-                      props.loading ||
-                      props.deleteConfirmation !== props.group.name
+                      loading ||
+                      deleteConfirmation !== group.name
                     }
-                    onClick={props.onDelete}
+                    onClick={onDelete}
                   >
-                    {props.loading
+                    {loading
                       ? t("Deleting…")
                       : t("Permanently delete group")}
                   </button>
@@ -1245,143 +1126,6 @@ function SettingsHome(props: SettingsHomeProps) {
           </section>
         </>
       )}
-      {props.error && <p className="auth-error">{props.error}</p>}
-    </>
-  );
-}
-
-function GroupInvitation({
-  groupId,
-  groupName,
-}: {
-  groupId: string;
-  groupName: string;
-}) {
-  const { t } = useI18n();
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    async function loadPin() {
-      setLoading(true);
-      setError("");
-      const response = await fetch(`/api/groups/${groupId}/pin`);
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-        pin?: string;
-      } | null;
-      if (!response.ok || !result?.pin) {
-        if (active) {
-          setError(t(result?.error ?? "Could not load the group PIN."));
-        }
-      } else if (active) {
-        setPin(result.pin);
-      }
-      if (active) setLoading(false);
-    }
-    void loadPin();
-    return () => {
-      active = false;
-    };
-  }, [groupId, t]);
-
-  const invitation = pin
-    ? t(
-        "Join {{group}} on Carpool Together!\n\nOpen the app: {{url}}\nGroup PIN: {{pin}}",
-        {
-          group: groupName,
-          url: window.location.origin,
-          pin,
-        },
-      )
-    : "";
-
-  function shareOnWhatsApp() {
-    setMessage("");
-    setCopied(false);
-    if (!invitation) return;
-    const mobile =
-      window.matchMedia("(pointer: coarse)").matches ||
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(invitation)}`,
-      mobile ? "_self" : "_blank",
-      "noopener,noreferrer",
-    );
-  }
-
-  async function copyInvitation() {
-    setError("");
-    setMessage("");
-    setCopied(false);
-    if (!invitation) return;
-    try {
-      await navigator.clipboard.writeText(invitation);
-      setCopied(true);
-      setMessage(t("Invitation copied."));
-    } catch {
-      setError(t("Could not copy the invitation. Select WhatsApp instead."));
-    }
-  }
-
-  return (
-    <>
-      <h2 className="settings-section-title">{t("Group invitation")}</h2>
-      <section className="surface-card group-invitation-card">
-        <div className="card-heading">
-          <h2>
-            <Share2 size={20} />
-            {t("Share group")}
-          </h2>
-        </div>
-        <p className="text-muted">
-          {t(
-            "Send this group's app link and current PIN to your WhatsApp group.",
-          )}
-        </p>
-        <div
-          className="schedule-form"
-        >
-          <p className="text-muted">
-            {t("The current group PIN is added securely when you share.")}
-          </p>
-          {error && (
-            <p className="auth-error" role="alert">
-              {error}
-            </p>
-          )}
-          {message && (
-            <p className="auth-message" role="status">
-              {message}
-            </p>
-          )}
-          <div className="confirmation-actions">
-            <button
-              className="primary-button"
-              type="button"
-              disabled={loading || !pin}
-              onClick={shareOnWhatsApp}
-            >
-              <Share2 size={18} aria-hidden="true" />
-              {loading ? t("Preparing invitation…") : t("Share on WhatsApp")}
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={loading || !pin}
-              onClick={() => void copyInvitation()}
-            >
-              {copied ? <Check size={18} /> : <Copy size={18} />}
-              {copied ? t("Invitation copied") : t("Copy invitation")}
-            </button>
-          </div>
-        </div>
-      </section>
     </>
   );
 }
