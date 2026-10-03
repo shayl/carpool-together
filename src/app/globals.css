@@ -2143,7 +2143,8 @@ button:disabled {
 .settings-link-card button {
   display: grid;
   width: 100%;
-  grid-template-columns: 24px minmax(0, 1fr) 20px;
+  /* The leading slot is either an icon or a 42px group avatar. */
+  grid-template-columns: auto minmax(0, 1fr) 20px;
   align-items: center;
   gap: 12px;
   padding: 14px 18px;

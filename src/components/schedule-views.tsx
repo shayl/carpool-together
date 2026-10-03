@@ -121,6 +121,11 @@ function displayDate(date: Date, pattern: string, locale: "en" | "he") {
   });
 }
 
+// Stored times are "HH:mm:ss"; the minutes are precise enough to read.
+function displayTime(time: string) {
+  return time.slice(0, 5);
+}
+
 function useCurrentTime(initialDate: string) {
   const [now, setNow] = useState(() => parseISO(initialDate));
   useEffect(() => {
@@ -554,7 +559,7 @@ function MonthGrid({
                       type="button"
                       onClick={() => onOpen(event.id)}
                     >
-                      <strong>{event.startTime}</strong>
+                      <strong>{displayTime(event.startTime)}</strong>
                       <span>{t(eventTitle(event))}</span>
                       {drivers.length > 0 && (
                         <span className="month-event-driver">
@@ -633,7 +638,7 @@ function EventCard({
         </span>
         <span className="weekly-event-name">
           <strong>{t(eventTitle(event))}</strong>
-          <span className="event-time">{event.startTime}{event.endTime ? ` – ${event.endTime}` : ""}</span>
+          <span className="event-time">{displayTime(event.startTime)}{event.endTime ? ` – ${displayTime(event.endTime)}` : ""}</span>
           {location && <span className="event-location"><MapPin size={14} />{location.name}</span>}
           {/* Only when several groups share the list, where the title alone
               does not say which group an event belongs to. */}
