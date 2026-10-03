@@ -29,7 +29,8 @@ import { ThemePicker } from "@/components/theme-picker";
 import { ScheduleViews } from "@/components/schedule-views";
 import { Sheet } from "@/components/sheet";
 import { PullToRefresh, RefreshFeedback, ScheduleRefreshButton } from "@/components/pull-to-refresh";
-import type { AppGroup } from "@/lib/app-data";
+import { mergeGroupSchedules } from "@/lib/all-groups-schedule";
+import type { AppAccount, AppFamily, AppGroup } from "@/lib/app-data";
 import { LanguagePicker, useI18n } from "@/lib/i18n";
 import { AppTransportContext, useAppTransport, type AppTransport } from "@/lib/app-transport";
 import { availableGroupId, settingsSectionFromParams, type SettingsSection } from "@/lib/ui-navigation";
@@ -44,15 +45,19 @@ type SettingsPage = SettingsSection | null;
 const destinations = [
   { id: "rides", label: "Rides", icon: Car },
   { id: "family", label: "My family", icon: Heart },
-  { id: "team", label: "Team", icon: Users },
+  { id: "groups", label: "Groups", icon: Users },
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function CarpoolApp({
   initialGroups,
+  account,
+  family,
   initialNavigation,
 }: {
   initialGroups: AppGroup[];
+  account: AppAccount;
+  family: AppFamily | null;
   initialNavigation: NavigationState;
 }) {
   const router = useRouter();
@@ -142,7 +147,8 @@ export function CarpoolApp({
       const { createClient } = await import("@/lib/supabase/browser");
       if (disposed) return;
       const client = createClient();
-      const channel = client.channel(`group-updates-${group.id}`);
+      const groupIds = groups.map((item) => item.id);
+      const channel = client.channel(`group-updates-${groupIds.join("-")}`);
       for (const table of [
         "group_households",
         "group_access_roster",
@@ -161,7 +167,7 @@ export function CarpoolApp({
             event: "*",
             schema: "public",
             table,
-            filter: `group_id=eq.${group.id}`,
+            filter: `group_id=in.(${groupIds.join(",")})`,
           },
           refresh,
         );
@@ -178,7 +184,7 @@ export function CarpoolApp({
       clearTimeout(refreshTimer);
       unsubscribe?.();
     };
-  }, [group.id, router, transport.preview, t]);
+  }, [groups, router, transport.preview, t]);
 
   function navigate(nextDestination: Destination, history: "push" | "replace" = "push") {
     setDestination(nextDestination);
@@ -556,23 +562,9 @@ export function CarpoolApp({
       <header className="app-header">
         <div className="app-header-inner">
           <div className="brand-lockup">
-            <MemberAvatar
-              name={group.shortName}
-              photoUrl={group.iconUrl}
-              size={44}
-              className="team-logo"
-            />
             <div className="brand-copy">
-              {groups.length === 1 ? <p>{group.name}</p> : (
-                <label className="group-switcher group-identity-switcher">
-                  <span className="sr-only">{t("Active group")}</span>
-                  <select value={group.id} onChange={(event) => switchGroup(event.target.value, "rides")}>
-                    {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                  <ChevronDown size={16} aria-hidden="true" />
-                </label>
-              )}
-              <span>{group.currentMemberName}</span>
+              <p>{t("Carpool Together")}</p>
+              <span>{account.displayName}</span>
             </div>
             <ScheduleRefreshButton />
           </div>
@@ -610,14 +602,18 @@ export function CarpoolApp({
         )}
         {(destination === "rides" ||
           destination === "family" ||
-          destination === "team") && (
+          destination === "groups") && (
           <ScheduleViews
-            key={`${group.id}-${destination}`}
+            key={destination === "rides" ? "rides" : `${group.id}-${destination}`}
             groupId={group.id}
             groupName={group.name}
             canManage={group.canManageRoster}
             view={destination}
-            schedule={group.schedule}
+            schedule={
+              destination === "rides" ? mergeGroupSchedules(groups) : group.schedule
+            }
+            groups={groups}
+            family={family}
             roster={group.roster}
             currentRosterEntryId={group.currentRosterEntryId}
             uploadingImage={uploadingImage}
@@ -647,7 +643,7 @@ export function CarpoolApp({
           />
         )}
 
-        {destination === "team" && showAddMembers && (
+        {destination === "groups" && showAddMembers && (
           <Sheet title={t("Add people to the group")} busy={loading} onClose={() => setShowAddMembers(false)}>
             {group.canManageRoster && (
               <>

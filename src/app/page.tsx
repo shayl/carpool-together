@@ -3,7 +3,7 @@ import { CarpoolApp } from "@/components/carpool-app";
 import { ChangeCodeForm } from "@/components/auth/change-code-form";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { accountForUser, syncAccountMemberships } from "@/lib/account";
-import { loadAppData } from "@/lib/app-data";
+import { loadAccountFamily, loadAppData } from "@/lib/app-data";
 import { navigationStateFromSearchParams } from "@/lib/navigation-state";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -50,11 +50,21 @@ export default async function Home({ searchParams }: HomeProps) {
     return <ChangeCodeForm phone={account.phone} />;
   }
 
-  const groups = await loadAppData(userId);
+  const [groups, family] = await Promise.all([
+    loadAppData(userId),
+    loadAccountFamily(account),
+  ]);
 
   return (
     <CarpoolApp
       initialGroups={groups}
+      account={{
+        id: account.id,
+        phone: account.phone,
+        displayName: account.display_name ?? "",
+        familyId: account.family_id,
+      }}
+      family={family}
       initialNavigation={navigationStateFromSearchParams(urlSearchParams)}
     />
   );

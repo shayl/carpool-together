@@ -1,6 +1,6 @@
 import { format, isValid, parseISO, startOfWeek } from "date-fns";
 
-export type Destination = "rides" | "family" | "team" | "settings";
+export type Destination = "rides" | "family" | "groups" | "settings";
 export type CalendarDisplay = "week" | "month";
 
 export function calendarCursorDate(date: string, display: CalendarDisplay) {
@@ -20,7 +20,7 @@ export type NavigationState = {
 const destinations = new Set<Destination>([
   "rides",
   "family",
-  "team",
+  "groups",
   "settings",
 ]);
 

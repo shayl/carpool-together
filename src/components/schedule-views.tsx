@@ -40,6 +40,8 @@ import {
   effectiveAttendance,
   eventCoverage,
   isEventInBreak,
+  isOwnHousehold,
+  participantsInGroup,
   requiredLegs,
   rideState,
 } from "@/lib/schedule-state";
@@ -68,7 +70,7 @@ import type {
   RideLeg,
 } from "@/lib/schedule-types";
 import { useI18n } from "@/lib/i18n";
-import type { AppRosterEntry } from "@/lib/app-data";
+import type { AppFamily, AppGroup, AppRosterEntry } from "@/lib/app-data";
 import { useAppTransport } from "@/lib/app-transport";
 import {
   eligibleCurrentDriver,
@@ -86,7 +88,7 @@ import {
   type NavigationState,
 } from "@/lib/navigation-state";
 
-type ScheduleView = "rides" | "family" | "team";
+type ScheduleView = "rides" | "family" | "groups";
 
 type Props = {
   groupId: string;
@@ -94,6 +96,10 @@ type Props = {
   canManage: boolean;
   view: ScheduleView;
   schedule: GroupSchedule;
+  /** Every group the viewer belongs to, for the all-groups rides view. */
+  groups: AppGroup[];
+  /** The account's shared family, reused by every group. */
+  family: AppFamily | null;
   roster: AppRosterEntry[];
   uploadingImage?: string;
   onMemberPhoto?: (rosterEntryId: string, image: File) => void;
@@ -154,7 +160,7 @@ async function readResult(response: Response) {
 export function ScheduleViews(props: Props) {
   if (props.view === "rides") return <RidesSchedule {...props} />;
   if (props.view === "family") return <FamilySchedule {...props} />;
-  return <TeamSchedule {...props} />;
+  return <GroupsSchedule {...props} />;
 }
 
 function useMutation(groupId: string, offline = false) {
@@ -165,11 +171,15 @@ function useMutation(groupId: string, offline = false) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  // The rides view shows events from every group at once, so a mutation
+  // belongs to the event it came from rather than to one active group.
+  // Group-scoped views omit the override and keep using the hook's group.
   async function mutate(
     resource: GroupScheduleResource,
     method: string,
     body: unknown,
     key: string,
+    overrideGroupId?: string,
   ) {
     setBusyKey(key);
     setError("");
@@ -178,7 +188,7 @@ function useMutation(groupId: string, offline = false) {
       if (offline || !navigator.onLine) {
         throw new Error(t("Reconnect to make changes."));
       }
-      const response = await transport.request(groupResourceUrl(groupId, resource), {
+      const response = await transport.request(groupResourceUrl(overrideGroupId ?? groupId, resource), {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -238,6 +248,7 @@ function RidesSchedule({
   groupId,
   groupName,
   schedule,
+  groups,
   roster,
   currentRosterEntryId,
   offline,
@@ -314,11 +325,20 @@ function RidesSchedule({
     setFilter("all");
   }
 
+  // Several groups share this list, so each card says which group it is for
+  // and its roster comes from that group rather than the selected one.
+  const eventGroups = new Map(groups.map((item) => [item.id, item]));
+  const showGroupLabels = groups.length > 1;
+
   function renderEvent(event: GroupEvent) {
+    const eventGroup = eventGroups.get(event.groupId);
     return <EventCard
-      key={event.id} event={event} schedule={schedule} roster={roster}
+      key={`${event.groupId}-${event.id}`} event={event} schedule={schedule}
+      groupLabel={showGroupLabels ? eventGroup?.name : undefined}
+      roster={eventGroup?.roster ?? roster}
       today={format(now, "yyyy-MM-dd")}
-      currentRosterEntryId={currentRosterEntryId} nextUp={nextEvent?.id === event.id}
+      currentRosterEntryId={eventGroup?.currentRosterEntryId ?? currentRosterEntryId}
+      nextUp={nextEvent?.id === event.id}
       expanded={expanded === event.id}
       onToggle={() => setExpanded((current) => current === event.id ? null : event.id)}
       mutation={mutation}
@@ -553,6 +573,7 @@ function MonthGrid({
 
 function EventCard({
   event,
+  groupLabel,
   schedule,
   roster,
   currentRosterEntryId,
@@ -563,6 +584,8 @@ function EventCard({
   mutation,
 }: {
   event: GroupEvent;
+  /** Set only when the list spans several groups. */
+  groupLabel?: string;
   schedule: GroupSchedule;
   roster: AppRosterEntry[];
   currentRosterEntryId?: string | null;
@@ -586,8 +609,8 @@ function EventCard({
   const mood = coverageMood(coverage);
   const detailsId = useId();
   const header = useRef<HTMLButtonElement>(null);
-  const ownParticipants = schedule.participants.filter(
-    (participant) => participant.householdId === schedule.currentHouseholdId,
+  const ownParticipants = participantsInGroup(schedule, event).filter(
+    (participant) => isOwnHousehold(schedule, participant.householdId),
   );
   const [changingPlans, setChangingPlans] = useState(false);
 
@@ -610,6 +633,9 @@ function EventCard({
           <strong>{t(eventTitle(event))}</strong>
           <span className="event-time">{event.startTime}{event.endTime ? ` – ${event.endTime}` : ""}</span>
           {location && <span className="event-location"><MapPin size={14} />{location.name}</span>}
+          {/* Only when several groups share the list, where the title alone
+              does not say which group an event belongs to. */}
+          {groupLabel && <span className="event-group-label">{groupLabel}</span>}
         </span>
         <span className="weekly-event-coverage">
           <RideStatusCar status={coverage} />
@@ -638,7 +664,7 @@ function EventCard({
             </button>
           </div>
           <div className="member-avatar-row" aria-label={t("Member ride status")}>
-            {schedule.participants.map((participant) => {
+            {participantsInGroup(schedule, event).map((participant) => {
               const attendance = effectiveAttendance(
                 schedule,
                 event,
@@ -717,7 +743,7 @@ function DriverPicker({ event, leg, roster, mutation, onClose }: {
       input.preventDefault();
       const saved = await mutation.mutate("claims", "POST", {
         eventId: event.id, leg, driverRosterEntryId: driverId,
-      }, `claim-${event.id}-${leg}`);
+      }, `claim-${event.id}-${leg}`, event.groupId);
       if (saved) onClose();
     }}>
       <p>{t(legKey(leg))} · {t(eventTitle(event))} · {event.date}</p>
@@ -796,6 +822,7 @@ function RideLegPanel({
                 "DELETE",
                 { eventId: event.id, leg },
                 `release-${event.id}-${leg}`,
+                event.groupId,
               );
             }}
           >
@@ -814,6 +841,7 @@ function RideLegPanel({
                 "POST",
                 { eventId: event.id, leg, driverRosterEntryId: currentDriver.id },
                 `claim-${event.id}-${leg}`,
+                event.groupId,
               ) : setChoosingDriver(true)
             }
           >
@@ -1138,7 +1166,7 @@ function ParticipantStatusEditor({
         const saved = await mutation.mutate("attendance", "PUT", {
           eventId: event.id, participantId: participant.id,
           absent: draft.absent, optOutTo: draft.optOutTo, optOutFrom: draft.optOutFrom,
-        }, `attendance-${event.id}-${participant.id}`);
+        }, `attendance-${event.id}-${participant.id}`, event.groupId);
         if (saved) onClose();
       }}>
         <div className="card-heading">
@@ -1815,7 +1843,7 @@ function FamilyEditForm({
   );
 }
 
-function TeamSchedule({
+function GroupsSchedule({
   groupId,
   canManage,
   schedule,

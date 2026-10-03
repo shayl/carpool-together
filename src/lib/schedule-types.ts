@@ -106,4 +106,9 @@ export type GroupSchedule = {
   absencePeriods: AbsencePeriod[];
   templates: ScheduleTemplate[];
   currentHouseholdId: string | null;
+  /**
+   * Set only when several groups are shown together, where the viewer has a
+   * different household in each. Prefer `isOwnHousehold`, which reads both.
+   */
+  currentHouseholdIds?: string[];
 };

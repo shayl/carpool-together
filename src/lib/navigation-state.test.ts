@@ -4,7 +4,7 @@ import { calendarCursorDate, navigationStateFromSearchParams } from "@/lib/navig
 
 test("creates a complete navigation snapshot from the URL", () => {
   const params = new URLSearchParams({
-    tab: "team",
+    tab: "groups",
     view: "month",
     date: "2026-10-12",
     venue: "shared-venue",
@@ -16,7 +16,7 @@ test("creates a complete navigation snapshot from the URL", () => {
       new Date("2026-09-30T12:00:00Z"),
     ),
     {
-      destination: "team",
+      destination: "groups",
       calendarDisplay: "month",
       calendarDate: "2026-10-12",
       currentDate: "2026-09-30",

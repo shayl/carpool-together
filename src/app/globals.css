@@ -3156,3 +3156,14 @@ summary {
     padding: 4px 2px;
   }
 }
+
+.event-group-label {
+  display: inline-block;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--accent-tint);
+  padding: 2px 8px;
+  color: var(--team);
+  font-size: 11px;
+  font-weight: 700;
+}

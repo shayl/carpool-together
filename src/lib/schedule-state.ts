@@ -6,6 +6,19 @@ import type {
   RideLeg,
 } from "./schedule-types";
 
+// A person belongs to one household per group, so "mine" has to consider all
+// of them once several groups are shown at once.
+export function isOwnHousehold(
+  schedule: GroupSchedule,
+  householdId: string | null | undefined,
+) {
+  if (!householdId) return false;
+  if (schedule.currentHouseholdIds?.length) {
+    return schedule.currentHouseholdIds.includes(householdId);
+  }
+  return householdId === schedule.currentHouseholdId;
+}
+
 export function requiredLegs(event: GroupEvent): RideLeg[] {
   return [
     ...(event.needsTo ? ["to_event" as const] : []),
@@ -58,12 +71,23 @@ export function effectiveAttendance(
   };
 }
 
+// Riders of the event's own group. When several groups are shown together
+// the schedule holds everyone's riders, and an event only concerns its own.
+export function participantsInGroup(
+  schedule: GroupSchedule,
+  event: GroupEvent,
+) {
+  return schedule.participants.filter(
+    (participant) => participant.groupId === event.groupId,
+  );
+}
+
 export function participantsNeedingRide(
   schedule: GroupSchedule,
   event: GroupEvent,
   leg: RideLeg,
 ) {
-  return schedule.participants.filter((participant) => {
+  return participantsInGroup(schedule, event).filter((participant) => {
     const attendance = effectiveAttendance(schedule, event, participant);
     if (attendance.absent) return false;
     return leg === "to_event"
@@ -91,7 +115,7 @@ export function rideState(
     open: active && !claim,
     mine:
       active &&
-      claim?.householdId === schedule.currentHouseholdId,
+      isOwnHousehold(schedule, claim?.householdId),
     claim,
     participants,
     household: schedule.households.find(
