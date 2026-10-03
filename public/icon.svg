@@ -8,15 +8,15 @@
   </defs>
   <rect width="512" height="512" fill="url(#carpool-bg)"/>
   <g transform="translate(256 256) scale(1.1) translate(-256 -256)">
-    <rect x="90" y="219" width="332" height="110" rx="28" fill="#fff6e6"/>
-    <path fill="#fff6e6" d="M148 249 L206 155 Q213 147 223 146 L289 146 Q299 147 306 155 L364 249 Z"/>
-    <path fill="#31283d" d="M178 239 L204 177 L250 177 L250 239 Z"/>
-    <path fill="#31283d" d="M262 239 L262 177 L308 177 L334 239 Z"/>
-    <circle cx="221" cy="207" r="20" fill="#fff6e6"/>
-    <circle cx="291" cy="207" r="20" fill="#fff6e6"/>
-    <circle cx="148" cy="329" r="34" fill="#fff6e6"/>
-    <circle cx="364" cy="329" r="34" fill="#fff6e6"/>
-    <circle cx="148" cy="329" r="28" fill="#31283d"/>
-    <circle cx="364" cy="329" r="28" fill="#31283d"/>
+    <rect x="88" y="238" width="336" height="91" rx="26" fill="#fff6e6"/>
+    <path fill="#fff6e6" d="M144 262 L204 150 Q212 141 223 140 L289 140 Q300 141 308 150 L368 262 Z"/>
+    <path fill="#31283d" d="M174 250 L202 174 L250 174 L250 250 Z"/>
+    <path fill="#31283d" d="M262 250 L262 174 L310 174 L338 250 Z"/>
+    <circle cx="220" cy="208" r="21" fill="#fff6e6"/>
+    <circle cx="292" cy="208" r="21" fill="#fff6e6"/>
+    <circle cx="146" cy="329" r="36" fill="#fff6e6"/>
+    <circle cx="366" cy="329" r="36" fill="#fff6e6"/>
+    <circle cx="146" cy="329" r="30" fill="#31283d"/>
+    <circle cx="366" cy="329" r="30" fill="#31283d"/>
   </g>
 </svg>

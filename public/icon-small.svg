@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="carpool-small-title">
+  <title id="carpool-small-title">Carpool Together</title>
+  <defs>
+    <linearGradient id="carpool-small-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f5fe8"/>
+      <stop offset="1" stop-color="#4a39c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" fill="url(#carpool-small-bg)"/>
+  <rect x="4" y="27" width="56" height="20" rx="6.5" fill="#fff6e6"/>
+  <path fill="#fff6e6" d="M16 34 L25 12 Q27 9 31 9 L37 9 Q41 9 43 12 L52 34 Z"/>
+  <path fill="#31283d" d="M18 31 L25 15 L33 15 L33 31 Z"/>
+  <path fill="#31283d" d="M35 31 L35 15 L43 15 L50 31 Z"/>
+  <circle cx="26.8" cy="25" r="3.4" fill="#fff6e6"/>
+  <circle cx="41.2" cy="25" r="3.4" fill="#fff6e6"/>
+  <circle cx="14" cy="47" r="8" fill="#fff6e6"/>
+  <circle cx="50" cy="47" r="8" fill="#fff6e6"/>
+  <circle cx="14" cy="47" r="6.5" fill="#31283d"/>
+  <circle cx="50" cy="47" r="6.5" fill="#31283d"/>
+</svg>
